@@ -1,0 +1,55 @@
+{
+  "url": "https://walled-shop.example/",
+  "fetchedAt": "2026-11-01T12:00:00Z",
+  "siteTypeOverride": null,
+  "robots": {
+    "status": 404,
+    "file": null
+  },
+  "sitemap": {
+    "status": 200,
+    "file": "sitemap.xml"
+  },
+  "llms": {
+    "status": 404,
+    "file": null
+  },
+  "pages": [
+    {
+      "id": "home",
+      "url": "https://walled-shop.example/",
+      "kind": "home",
+      "status": 200,
+      "ttfbMs": 300,
+      "raw": "pages/home.raw.html",
+      "rendered": "pages/home.rendered.html"
+    },
+    {
+      "id": "kettle",
+      "url": "https://walled-shop.example/products/trail-kettle",
+      "kind": "product",
+      "status": 200,
+      "ttfbMs": 1500,
+      "raw": "pages/kettle.raw.html",
+      "rendered": "pages/kettle.rendered.html"
+    },
+    {
+      "id": "mug",
+      "url": "https://walled-shop.example/products/enamel-mug",
+      "kind": "product",
+      "status": 403,
+      "ttfbMs": 90,
+      "raw": "pages/mug.raw.html",
+      "rendered": "pages/mug.rendered.html"
+    },
+    {
+      "id": "cart",
+      "url": "https://walled-shop.example/cart",
+      "kind": "cart",
+      "status": 200,
+      "ttfbMs": 400,
+      "raw": "pages/cart.raw.html",
+      "rendered": "pages/cart.rendered.html"
+    }
+  ]
+}

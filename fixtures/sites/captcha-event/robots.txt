@@ -1,0 +1,8 @@
+User-agent: ExampleAIBot
+Disallow: /
+
+User-agent: *
+Allow: /
+Disallow: /account/
+
+Sitemap: https://captcha-event.example/sitemap.xml

@@ -1,0 +1,8 @@
+# Harbor Code Meetup
+
+> Harbor Code Meetup is a fictional business used as a Crawlspace test fixture.
+
+## Pages
+
+- [Main event](https://captcha-event.example/events/main): date, venue and tickets
+- [Register](https://captcha-event.example/register): registration form

@@ -1,0 +1,14 @@
+User-agent: ExampleAIBot
+Disallow: /
+
+User-agent: SampleAgent-User
+Disallow: /
+
+User-agent: DemoSearchBot
+Disallow: /
+
+User-agent: *
+Allow: /
+Disallow: /account/
+
+Sitemap: https://ai-blocking-shop.example/sitemap.xml

@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /account/
+
+Sitemap: https://event-missing-startdate.example/sitemap.xml

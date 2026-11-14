@@ -1,0 +1,46 @@
+{
+  "url": "https://captcha-event.example/",
+  "fetchedAt": "2026-11-01T12:00:00Z",
+  "siteTypeOverride": null,
+  "robots": {
+    "status": 200,
+    "file": "robots.txt"
+  },
+  "sitemap": {
+    "status": 200,
+    "file": "sitemap.xml"
+  },
+  "llms": {
+    "status": 200,
+    "file": "llms.txt"
+  },
+  "pages": [
+    {
+      "id": "home",
+      "url": "https://captcha-event.example/",
+      "kind": "home",
+      "status": 200,
+      "ttfbMs": 200,
+      "raw": "pages/home.raw.html",
+      "rendered": "pages/home.rendered.html"
+    },
+    {
+      "id": "event",
+      "url": "https://captcha-event.example/events/main",
+      "kind": "event",
+      "status": 200,
+      "ttfbMs": 220,
+      "raw": "pages/event.raw.html",
+      "rendered": "pages/event.rendered.html"
+    },
+    {
+      "id": "register",
+      "url": "https://captcha-event.example/register",
+      "kind": "registration",
+      "status": 200,
+      "ttfbMs": 240,
+      "raw": "pages/register.raw.html",
+      "rendered": "pages/register.rendered.html"
+    }
+  ]
+}

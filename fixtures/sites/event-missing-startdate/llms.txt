@@ -1,0 +1,8 @@
+# Cedar Hollow Folk Night
+
+> Cedar Hollow Folk Night is a fictional business used as a Crawlspace test fixture.
+
+## Pages
+
+- [Main event](https://event-missing-startdate.example/events/main): date, venue and tickets
+- [Register](https://event-missing-startdate.example/register): registration form

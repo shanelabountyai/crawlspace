@@ -1,0 +1,32 @@
+{
+  "siteType": "ecommerce",
+  "overall": 79.0,
+  "categories": {
+    "A": 94.4,
+    "B": 100.0,
+    "C": 28.6,
+    "D": 50.0,
+    "E": 88.9,
+    "F": 100.0
+  },
+  "checks": {
+    "A1": "pass",
+    "A2": "pass",
+    "A3": "partial",
+    "A4": "pass",
+    "B1": "pass",
+    "B2": "pass",
+    "C1": "partial",
+    "C2": "fail",
+    "C3": "not-applicable",
+    "C4": "pass",
+    "D1": "partial",
+    "D2": "partial",
+    "E1": "pass",
+    "E2": "partial",
+    "E3": "pass",
+    "E4": "pass",
+    "F1": "pass",
+    "F2": "pass"
+  }
+}

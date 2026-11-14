@@ -1,0 +1,46 @@
+{
+  "url": "https://ai-blocking-shop.example/",
+  "fetchedAt": "2026-11-01T12:00:00Z",
+  "siteTypeOverride": null,
+  "robots": {
+    "status": 200,
+    "file": "robots.txt"
+  },
+  "sitemap": {
+    "status": 200,
+    "file": "sitemap.xml"
+  },
+  "llms": {
+    "status": 404,
+    "file": null
+  },
+  "pages": [
+    {
+      "id": "home",
+      "url": "https://ai-blocking-shop.example/",
+      "kind": "home",
+      "status": 200,
+      "ttfbMs": 200,
+      "raw": "pages/home.raw.html",
+      "rendered": "pages/home.rendered.html"
+    },
+    {
+      "id": "kettle",
+      "url": "https://ai-blocking-shop.example/products/trail-kettle",
+      "kind": "product",
+      "status": 200,
+      "ttfbMs": 230,
+      "raw": "pages/kettle.raw.html",
+      "rendered": "pages/kettle.rendered.html"
+    },
+    {
+      "id": "cart",
+      "url": "https://ai-blocking-shop.example/cart",
+      "kind": "cart",
+      "status": 200,
+      "ttfbMs": 250,
+      "raw": "pages/cart.raw.html",
+      "rendered": "pages/cart.rendered.html"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "note": "Synthetic AI user agents used only by fixture tests, so fixture results never depend on the real (dated) list in rules/agents.json. Not real crawlers.",
+  "agents": [
+    { "token": "ExampleAIBot", "operator": "Example Labs (fictional)", "verifiedOn": "2026-11-14", "source": "https://agents.example/example-ai-bot" },
+    { "token": "SampleAgent-User", "operator": "Sample Assist (fictional)", "verifiedOn": "2026-11-14", "source": "https://agents.example/sample-agent" },
+    { "token": "DemoSearchBot", "operator": "Demo Search (fictional)", "verifiedOn": "2026-11-14", "source": "https://agents.example/demo-search-bot" }
+  ]
+}

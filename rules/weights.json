@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "note": "Rubric v1 weights (PRD §3). Data, not code: edit here. D1 (llms.txt) is deliberately low: proposed convention (D-04). N/A checks are dropped from the score, never counted as passes.",
+  "statusValues": { "pass": 1, "partial": 0.5, "fail": 0 },
+  "checks": {
+    "A1": 2,
+    "A2": 3,
+    "A3": 1,
+    "A4": 3,
+    "B1": 4,
+    "B2": 2,
+    "C1": 2,
+    "C2": 4,
+    "C3": 4,
+    "C4": 1,
+    "D1": 0.5,
+    "D2": 1,
+    "E1": 3,
+    "E2": 2,
+    "E3": 2,
+    "E4": 2,
+    "F1": 1,
+    "F2": 1
+  }
+}
