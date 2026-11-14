@@ -1,0 +1,20 @@
+{
+  "note": "AI user agents checked by A2. Only entries verified against the operator's official documentation belong in `agents`, each with `verifiedOn` (YYYY-MM-DD) and `source`. Phase 1 ran offline, so nothing could be verified and `agents` is empty (D-10): A2 reports not-applicable until entries are added. `pendingVerification` is NOT read by the engine; it is a to-do list of tokens to verify, with the doc URL to check. Candidate URLs are unverified and may have moved.",
+  "lastReviewed": null,
+  "agents": [],
+  "pendingVerification": [
+    { "token": "GPTBot", "operator": "OpenAI", "candidateSource": "https://platform.openai.com/docs/bots" },
+    { "token": "OAI-SearchBot", "operator": "OpenAI", "candidateSource": "https://platform.openai.com/docs/bots" },
+    { "token": "ChatGPT-User", "operator": "OpenAI", "candidateSource": "https://platform.openai.com/docs/bots" },
+    { "token": "ClaudeBot", "operator": "Anthropic", "candidateSource": null },
+    { "token": "Claude-User", "operator": "Anthropic", "candidateSource": null },
+    { "token": "Claude-SearchBot", "operator": "Anthropic", "candidateSource": null },
+    { "token": "PerplexityBot", "operator": "Perplexity", "candidateSource": "https://docs.perplexity.ai/guides/bots" },
+    { "token": "Perplexity-User", "operator": "Perplexity", "candidateSource": "https://docs.perplexity.ai/guides/bots" },
+    { "token": "Google-Extended", "operator": "Google", "candidateSource": "https://developers.google.com/search/docs/crawling-indexing/google-common-crawlers" },
+    { "token": "Applebot-Extended", "operator": "Apple", "candidateSource": "https://support.apple.com/en-us/119829" },
+    { "token": "CCBot", "operator": "Common Crawl", "candidateSource": "https://commoncrawl.org/ccbot" },
+    { "token": "Amazonbot", "operator": "Amazon", "candidateSource": "https://developer.amazon.com/amazonbot" },
+    { "token": "meta-externalagent", "operator": "Meta", "candidateSource": null }
+  ]
+}

@@ -1,0 +1,8 @@
+# Brightwater Summit
+
+> Brightwater Summit is a fictional business used as a Crawlspace test fixture.
+
+## Pages
+
+- [Main event](https://good-event.example/events/main): date, venue and tickets
+- [Register](https://good-event.example/register): registration form

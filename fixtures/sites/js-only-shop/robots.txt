@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /account/
+
+Sitemap: https://js-only-shop.example/sitemap.xml

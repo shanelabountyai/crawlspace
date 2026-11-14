@@ -1,0 +1,7 @@
+# Fernhill Outfitters
+
+> Fernhill Outfitters is a fictional business used as a Crawlspace test fixture.
+
+## Pages
+
+- [Trail Kettle 1L](https://good-shop.example/products/trail-kettle): 1 litre camping kettle

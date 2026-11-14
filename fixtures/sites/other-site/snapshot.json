@@ -1,0 +1,37 @@
+{
+  "url": "https://other-site.example/",
+  "fetchedAt": "2026-11-01T12:00:00Z",
+  "siteTypeOverride": null,
+  "robots": {
+    "status": 200,
+    "file": "robots.txt"
+  },
+  "sitemap": {
+    "status": 200,
+    "file": "sitemap.xml"
+  },
+  "llms": {
+    "status": 404,
+    "file": null
+  },
+  "pages": [
+    {
+      "id": "home",
+      "url": "https://other-site.example/",
+      "kind": "home",
+      "status": 200,
+      "ttfbMs": 210,
+      "raw": "pages/home.raw.html",
+      "rendered": "pages/home.rendered.html"
+    },
+    {
+      "id": "services",
+      "url": "https://other-site.example/services",
+      "kind": "other",
+      "status": 200,
+      "ttfbMs": 220,
+      "raw": "pages/services.raw.html",
+      "rendered": "pages/services.rendered.html"
+    }
+  ]
+}
