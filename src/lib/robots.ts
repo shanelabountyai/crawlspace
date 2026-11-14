@@ -74,3 +74,11 @@ export function isAllowed(groups: RobotsGroup[], token: string, path: string): R
   }
   return { allowed: best ? best.allow : true, rule: best };
 }
+
+/** `Sitemap:` lines (they are global, not tied to a user-agent group). */
+export function sitemapsFromRobots(body: string): string[] {
+  return body
+    .split(/\r?\n/)
+    .map((l) => /^\s*sitemap\s*:\s*(\S+)/i.exec(l)?.[1])
+    .filter((x): x is string => Boolean(x));
+}

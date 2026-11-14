@@ -11,6 +11,7 @@ permissions:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -18,6 +19,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
+      - name: Install Chromium for the renderer tests
+        run: npx playwright install --with-deps chromium
       - run: npm run lint
       - run: npm run typecheck
       - run: npm test
