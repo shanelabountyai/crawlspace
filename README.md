@@ -2,10 +2,12 @@
 
 Agent-readiness scanner: point it at a site, get a scorecard of how well AI agents can read and act on it, plus a ranked fix list.
 
-Build-log #25. Status: **Phase 1 (pure engine)**: snapshot type, 18 checks, scoring, 9 synthetic fixture sites, CLI. No network yet. Spec in `docs/PRD.md`, plan in `docs/PHASE1_PLAN.md`, decisions in `docs/DECISIONS.md`.
+Build-log #25. Status: **Phase 2 (crawler)** on top of the Phase 1 engine: a polite crawler (CrawlspaceBot, robots.txt, ≤ 15 pages, 1 req/s per host, GET only), SSRF guard and sandboxed headless Chromium feed the 18 checks. Spec in `docs/PRD.md`, plans in `docs/PHASE1_PLAN.md` and `docs/PHASE2_PLAN.md`, decisions in `docs/DECISIONS.md`.
 
 ```bash
 npm install
+npm run scan yoursite.com             # crawl a live site and score it
+npm run scan yoursite.com -- --save examples/yoursite   # also keep the snapshot
 npm run scan:fixture good-shop        # table + JSON scorecard for a synthetic site
 npm run scan:fixture js-only-shop -- --json
 npm run lint && npm run typecheck && npm test

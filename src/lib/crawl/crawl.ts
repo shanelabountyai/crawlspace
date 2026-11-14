@@ -1,0 +1,159 @@
+import { isAllowed, parseRobots, sitemapsFromRobots, type RobotsGroup } from "../robots";
+import { pathOf } from "../html";
+import { SnapshotSchema, type Page, type PageKind, type Resource, type Snapshot } from "../snapshot";
+import { MAX_KEY_PAGES, ROBOTS_TOKEN } from "./config";
+import { extractLinks, findActionLink, guessSiteType, pageKind, parseSitemap, pickKeyPages, sameSite } from "./discover";
+import { BudgetExceeded, Fetcher, type FetchResult, type FetcherOptions } from "./fetcher";
+import { NoRenderer, PlaywrightRenderer, type RenderEvent, type Renderer } from "./render";
+import { assertAllowed, parseTarget, SsrfError } from "./ssrf";
+
+export interface CrawlOptions extends FetcherOptions {
+  /** Render pages in headless Chromium (default true). */
+  render?: boolean;
+  /** Inject a renderer (tests). */
+  renderer?: (fetcher: Fetcher) => Renderer;
+}
+
+export interface CrawlReport {
+  requests: Fetcher["log"];
+  renderEvents: RenderEvent[];
+  skipped: { url: string; reason: string }[];
+  notes: string[];
+}
+
+export interface CrawlResult {
+  snapshot: Snapshot;
+  report: CrawlReport;
+}
+
+export class CrawlRefused extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "CrawlRefused";
+  }
+}
+
+/** Accept "example.com" as well as full URLs; only http(s). */
+export function normaliseStartUrl(input: string): string {
+  const trimmed = input.trim();
+  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const url = parseTarget(withScheme);
+  url.hash = "";
+  return url.href;
+}
+
+function errText(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+/** Crawl one site politely and return a snapshot the Phase 1 engine can score. */
+export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise<CrawlResult> {
+  const startUrl = normaliseStartUrl(input);
+  await assertAllowed(startUrl, opts.guard); // CS-03: refused before anything is sent
+
+  const fetcher = new Fetcher(opts);
+  const renderer = opts.renderer ? opts.renderer(fetcher) : opts.render === false ? new NoRenderer() : new PlaywrightRenderer(fetcher);
+  const report: CrawlReport = { requests: fetcher.log, renderEvents: renderer.events, skipped: [], notes: [] };
+  const fetchedAt = new Date().toISOString();
+
+  const tryGet = async (url: string, why: string): Promise<FetchResult | null> => {
+    try {
+      return await fetcher.get(url, "page");
+    } catch (e) {
+      if (e instanceof BudgetExceeded) report.skipped.push({ url, reason: `page budget used up (${why})` });
+      else if (e instanceof SsrfError) report.skipped.push({ url, reason: `refused: ${e.message}` });
+      else report.notes.push(`${why} ${url} failed: ${errText(e)}`);
+      return null;
+    }
+  };
+  const resource = (url: string, r: FetchResult | null): Resource => ({ url, status: r?.status ?? 0, body: r && r.status === 200 ? r.body : null });
+
+  try {
+    // 1. robots.txt for our own user agent
+    const origin0 = new URL(startUrl).origin;
+    const robotsRes = await tryGet(`${origin0}/robots.txt`, "robots.txt");
+    // RFC 9309: 4xx = no rules; 5xx = treat as "disallow all", so we do not scan.
+    if (robotsRes && robotsRes.status >= 500) throw new CrawlRefused(`robots.txt returned ${robotsRes.status}; treating as disallow-all and not scanning`);
+    let groups: RobotsGroup[] = robotsRes && robotsRes.status === 200 ? parseRobots(robotsRes.body) : [];
+    const allowed = (url: string) => isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed;
+    if (!allowed(startUrl)) throw new CrawlRefused(`robots.txt disallows ${ROBOTS_TOKEN} from ${pathOf(startUrl)}; not scanning`);
+
+    // 2. home page (follows redirects; the final URL defines the site)
+    const homeRes = await tryGet(startUrl, "home page");
+    if (!homeRes) throw new CrawlRefused(`could not fetch the home page: ${report.notes.at(-1) ?? report.skipped.at(-1)?.reason ?? "unknown error"}`);
+    const home = homeRes.url;
+    const origin = new URL(home).origin;
+    let robots = resource(`${origin0}/robots.txt`, robotsRes);
+    if (origin !== origin0) {
+      report.notes.push(`home redirected to ${origin}; using its robots.txt`);
+      const r2 = await tryGet(`${origin}/robots.txt`, "robots.txt");
+      robots = resource(`${origin}/robots.txt`, r2);
+      groups = r2 && r2.status === 200 ? parseRobots(r2.body) : [];
+    }
+
+    // 3. sitemap (robots.txt pointer first, then /sitemap.xml; one level of sitemap index)
+    const pointed = robots.body ? sitemapsFromRobots(robots.body).find((u) => sameSite(u, home)) : undefined;
+    const sitemapUrl = pointed ?? `${origin}/sitemap.xml`;
+    const smRes = await tryGet(sitemapUrl, "sitemap");
+    const sitemap = resource(sitemapUrl, smRes);
+    let sitemapUrls: string[] = [];
+    if (sitemap.body) {
+      const parsed = parseSitemap(sitemap.body);
+      sitemapUrls = parsed.urls;
+      const child = parsed.childSitemaps.find((u) => sameSite(u, home));
+      if (child) {
+        const c = await tryGet(child, "child sitemap");
+        if (c && c.status === 200) {
+          sitemapUrls = parseSitemap(c.body).urls;
+          sitemap.body = `${sitemap.body}\n<!-- child sitemap ${child} -->\n${c.body}`;
+        }
+      }
+    }
+
+    // 4. llms.txt
+    const llmsRes = await tryGet(`${origin}/llms.txt`, "llms.txt");
+    const llms = resource(`${origin}/llms.txt`, llmsRes);
+
+    // 5. key pages
+    const homeLinks = extractLinks(homeRes.body, home);
+    const hint = guessSiteType(homeRes.body, [...homeLinks.map((l) => l.url), ...sitemapUrls]);
+    const { picked, skipped } = pickKeyPages(hint, home, homeLinks, sitemapUrls, MAX_KEY_PAGES, allowed);
+    for (const u of skipped) report.skipped.push({ url: u, reason: `robots.txt disallows ${ROBOTS_TOKEN}` });
+    const fetched: { res: FetchResult; kind: PageKind }[] = [{ res: homeRes, kind: "home" }];
+    for (const u of picked) {
+      const r = await tryGet(u, "key page");
+      if (r) fetched.push({ res: r, kind: pageKind(r.url, r.body) === "other" ? (hint === "event" ? "event" : "product") : pageKind(r.url, r.body) });
+    }
+
+    // 6. cart / registration entry (GET only, never submitted)
+    const action = findActionLink(hint, fetched.map((f) => ({ url: f.res.url, html: f.res.body })));
+    if (action && !fetched.some((f) => f.res.url === action.url)) {
+      if (!allowed(action.url)) report.skipped.push({ url: action.url, reason: `robots.txt disallows ${ROBOTS_TOKEN}` });
+      else {
+        const r = await tryGet(action.url, "action page");
+        if (r) fetched.push({ res: r, kind: action.kind });
+      }
+    }
+
+    // 7. render every fetched page (document served from the bytes already downloaded)
+    const pages: Page[] = [];
+    const counts = new Map<string, number>();
+    for (const { res, kind } of fetched) {
+      let rendered = res.body;
+      try {
+        rendered = await renderer.render(res);
+      } catch (e) {
+        report.notes.push(`render of ${res.url} failed, using raw HTML: ${errText(e)}`);
+      }
+      const n = (counts.get(kind) ?? 0) + 1;
+      counts.set(kind, n);
+      pages.push({ id: kind === "home" ? "home" : `${kind}-${n}`, url: res.url, kind, status: res.status, ttfbMs: res.ttfbMs, rawHtml: res.body, renderedHtml: rendered });
+    }
+
+    const snapshot = SnapshotSchema.parse({ url: home, fetchedAt, siteTypeOverride: null, robots, sitemap, llms, pages });
+    return { snapshot, report };
+  } finally {
+    await renderer.close();
+    await fetcher.close();
+  }
+}
