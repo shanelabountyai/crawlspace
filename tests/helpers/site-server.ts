@@ -45,8 +45,8 @@ export class SiteServer {
     });
   }
 
-  async start(): Promise<this> {
-    await new Promise<void>((ok) => this.server.listen(0, "127.0.0.1", ok));
+  async start(port = 0): Promise<this> {
+    await new Promise<void>((ok) => this.server.listen(port, "127.0.0.1", ok));
     this.port = (this.server.address() as AddressInfo).port;
     return this;
   }

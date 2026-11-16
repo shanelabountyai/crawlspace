@@ -1,0 +1,13 @@
+{"fixes":[
+{"checkId":"C2","title":"Add Product and Offer data to the product page","why":"Shopping agents look for Product structured data. The product page has none an agent can use.","how":"Add a valid Product JSON-LD block with name and an Offer with price, priceCurrency and availability.","evidenceUrls":["{{origin}}/products/morning-blend"]},
+{"checkId":"C9","title":"Add Review markup","why":"Agents compare products by rating.","how":"Add AggregateRating to every product.","evidenceUrls":["{{origin}}/products/morning-blend"]},
+{"checkId":"B1","title":"Server-render the product name","why":"The product name only appears after JavaScript runs.","how":"Render it on the server.","evidenceUrls":["{{origin}}/products/morning-blend"]},
+{"checkId":"C1","title":"Fix the JSON-LD syntax error","why":"One JSON-LD block does not parse, so agents discard it.","how":"Correct the JSON syntax on the product page.","evidenceUrls":["{{origin}}/products/morning-blend"]},
+{"checkId":"E2","title":"Label the phone field","why":"The phone field in the cart has no label.","how":"Add a label to it.","evidenceUrls":["{{origin}}/products/imaginary-checkout"]},
+{"checkId":"D2","title":"Complete OpenGraph tags","why":"og:image and og:url are missing.","how":"Follow the guide at https://ogp.me/ and add both tags.","evidenceUrls":["{{origin}}/"]},
+{"checkId":"A3","title":"Date the sitemap","why":"The sitemap has no lastmod dates, and check F7 also shows the server is slow.","how":"Add lastmod to every URL.","evidenceUrls":["{{origin}}/sitemap.xml"]},
+{"checkId":"C2","title":"Add Product data (again)","why":"Repeated.","how":"Repeated.","evidenceUrls":[]},
+{"checkId":"D1","title":"Fix llms.txt","why":"It is malformed."},
+{"checkId":"E2","title":"Label the phone field in the cart","why":"Two of three cart fields are labelled; the phone field is not.","how":"Add a <label for> to the phone input.","evidenceUrls":["{{origin}}/cart"]},
+{"checkId":"D2","title":"Add og:image and og:url","why":"The home page is missing og:image and og:url.","how":"Add both meta tags to the home page head.","evidenceUrls":["{{origin}}/"]}
+]}
