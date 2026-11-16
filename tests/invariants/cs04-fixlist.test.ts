@@ -37,6 +37,16 @@ describe("CS-04 fix-list validator", () => {
     assertInsideInput(list, "broken-jsonld-shop");
   });
 
+  it("walled-shop recording: invented check, invented URL and a passing check named in prose are dropped", async () => {
+    const model = RecordedModel.fromFixture("walled-shop.invented.json", { origin: "https://walled-shop.example" });
+    const list = await generateFixList(card("walled-shop"), { model });
+    expect(list.dropped.byReason).toEqual({ malformed: 0, "unknown-check": 1, "unknown-url": 1, "unknown-check-in-text": 1, duplicate: 0 });
+    expect(list.items.map((i) => `${i.checkId}:${i.source}`)).toEqual([
+      "E3:llm", "A4:llm", "B1:llm", "C2:template", "E1:template", "A1:template", "A3:template", "D1:template", "F1:template",
+    ]);
+    assertInsideInput(list, "walled-shop");
+  });
+
   it("keeps a faithful reply whole (also inside a ```json fence)", async () => {
     for (const file of ["broken-jsonld-shop.faithful.json", "broken-jsonld-shop.fenced.md"]) {
       const list = await generateFixList(card("broken-jsonld-shop"), { model: RecordedModel.fromFixture(file, { origin: ORIGIN }) });
