@@ -27,8 +27,11 @@ describe("single scan path", () => {
     expect(readFileSync(join(root, "src/server/scan-service.ts"), "utf8")).toMatch(/\bassertAllowed\(/);
   });
 
-  it("only the live model adapter talks to anything over fetch", () => {
-    const fetchers = callers.filter((f) => /\bfetch\s*\(/.test(readFileSync(f, "utf8")));
-    expect(fetchers.map((f) => f.slice(root.length + 1))).toEqual(["src/server/anthropic-model.ts"]);
+  it("server side, only the live model adapter uses fetch; browser code only fetches the app's own /api", () => {
+    const server = callers.filter((f) => !f.includes(`${join("src", "app")}`) && /\bfetch\s*\(/.test(readFileSync(f, "utf8")));
+    expect(server.map((f) => f.slice(root.length + 1))).toEqual([join("src", "server", "anthropic-model.ts")]);
+    for (const f of callers.filter((f) => f.includes(join("src", "app")))) {
+      for (const m of readFileSync(f, "utf8").matchAll(/\bfetch\s*\(\s*(\S+)/g)) expect(m[1], f).toMatch(/^["`]\/api\//);
+    }
   });
 });

@@ -10,7 +10,7 @@ export const MIGRATIONS_DIR = join(process.cwd(), "prisma", "migrations");
 
 /** SQLite file for the app (D-03). `:memory:` is not supported: the migrator and Prisma open separate connections. */
 export function databaseFile(): string {
-  return resolve(process.env.DATABASE_FILE ?? join(process.cwd(), "data", "crawlspace.db"));
+  return resolve(/*turbopackIgnore: true*/ process.env.DATABASE_FILE ?? join(process.cwd(), "data", "crawlspace.db"));
 }
 
 /**
@@ -24,7 +24,7 @@ export function migrate(file: string, dir: string = MIGRATIONS_DIR): string[] {
     sqlite.pragma("journal_mode = WAL");
     sqlite.exec('CREATE TABLE IF NOT EXISTS "_crawlspace_migrations" ("name" TEXT NOT NULL PRIMARY KEY, "appliedAt" TEXT NOT NULL)');
     const done = new Set((sqlite.prepare('SELECT "name" FROM "_crawlspace_migrations"').all() as { name: string }[]).map((r) => r.name));
-    const names = readdirSync(dir, { withFileTypes: true })
+    const names = readdirSync(/*turbopackIgnore: true*/ dir, { withFileTypes: true })
       .filter((d) => d.isDirectory() && existsSync(join(dir, d.name, "migration.sql")))
       .map((d) => d.name)
       .sort();
