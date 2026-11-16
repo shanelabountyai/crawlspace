@@ -4,9 +4,8 @@
  * then scores it with the Phase 1 engine. --save writes the snapshot in fixture format (e.g. examples/<name>).
  */
 import { resolve } from "node:path";
-import { crawlSite, CrawlRefused, SsrfError } from "../src/lib/crawl";
+import { CrawlRefused, scanUrl, SsrfError } from "../src/lib/crawl";
 import { renderTable } from "../src/lib/report/table";
-import { scanSnapshot } from "../src/lib/scan";
 import { writeSnapshotToDir } from "../src/lib/snapshot";
 
 async function main() {
@@ -20,8 +19,7 @@ async function main() {
   }
   const json = args.includes("--json");
   try {
-    const { snapshot, report } = await crawlSite(url, { render: !args.includes("--no-render") });
-    const card = scanSnapshot(snapshot);
+    const { card, snapshot, report } = await scanUrl(url, { render: !args.includes("--no-render") });
     if (!json) {
       console.log(renderTable(card));
       console.log(`\n${report.requests.length} requests (${report.requests.filter((r) => r.kind === "page").length} pages, ${report.requests.filter((r) => r.kind === "asset").length} scripts/XHR); ${report.renderEvents.filter((e) => e.action === "blocked").length} browser requests blocked`);
