@@ -1,0 +1,41 @@
+// Crawlspace storage (D-03: SQLite via Prisma). The SQL in prisma/migrations is applied on startup (D-26);
+// CI checks it matches this schema.
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+/// One requested scan. status: queued | running | done | failed
+model Scan {
+  id         String    @id
+  url        String
+  status     String
+  error      String?
+  createdAt  DateTime
+  startedAt  DateTime?
+  finishedAt DateTime?
+  report     Report?
+
+  @@index([createdAt])
+}
+
+/// The result of a finished scan. JSON columns are stored as text.
+model Report {
+  scanId        String  @id
+  scan          Scan    @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  finalUrl      String
+  siteType      String
+  rubricVersion Int
+  overall       Float?
+  /// Scorecard (src/lib/scan.ts) as JSON
+  scorecard     String
+  /// FixList (src/lib/fixlist) as JSON
+  fixList       String
+  /// Crawl summary: request counts, skipped URLs, notes (no page HTML, D-29)
+  crawl         String
+}
