@@ -21,7 +21,8 @@ page, PDF export, deploy notes"). Phases 1–4 of PRD §8 are built; nothing is 
 
 An independent review of the PR found **0 must-fix, 7 should-fix, 7 nits**; no code was changed (D-44). Gate re-run on
 5360a42: `npm ci` (Prisma schema-engine stubbed, D-26), lint, typecheck, `npm test` 334/334, build, e2e 7/7 — all exit 0.
-Should-fix, to do before any deploy:
+CI on b200f46: pull_request run green, push run red on a CS-02 timing race in Phase 2 code (999 ms gap; D-45, fix in
+its own PR). Should-fix, to do before any deploy:
 
 1. Login limiter: `blocked()` runs before the body is read and `fail()` after, so concurrent requests skip the 10/15 min
    limit (`src/app/api/operator/login/route.ts:15-23`).
