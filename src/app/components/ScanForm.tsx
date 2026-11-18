@@ -5,13 +5,14 @@ import { useState, type FormEvent } from "react";
 import { plainError } from "./present";
 
 /** Scan form (Form.dc.html, PhoneForm.dc.html). Posts natively without JS; with JS shows refusals in place. */
-export function ScanForm() {
+export function ScanForm({ initialError }: { initialError?: string | null }) {
   const router = useRouter();
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(initialError ?? null);
   const [busy, setBusy] = useState(false);
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return; // aria-disabled, not disabled, so keyboard focus stays on the button (D-63)
     const url = String(new FormData(e.currentTarget).get("url") ?? "");
     setBusy(true);
     setError(null);
@@ -49,9 +50,10 @@ export function ScanForm() {
             required
             spellCheck={false}
             aria-invalid={msg ? true : undefined}
+            autoFocus={!!initialError}
             aria-describedby={msg ? "scan-error" : undefined}
           />
-          <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>
+          <button type="submit" className="btn btn-primary btn-lg" aria-disabled={busy || undefined}>
             {busy ? "Starting…" : "Scan my site"}
           </button>
         </div>

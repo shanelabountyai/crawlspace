@@ -127,7 +127,7 @@ h1, h2, h3 { font-family: var(--font-head); }
 .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--control); }
 .btn-secondary:hover { color: var(--ink); background: var(--subtle); }
 .btn-lg { min-height: 52px; padding: 0 24px; }
-.btn:disabled { opacity: 0.7; cursor: progress; }
+.btn:disabled, .btn[aria-disabled="true"] { opacity: 0.7; cursor: progress; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 .field-label { font-weight: 600; font-size: 15px; }
 .field-row { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -168,7 +168,7 @@ h1, h2, h3 { font-family: var(--font-head); }
 .progress-track { height: 10px; border-radius: 5px; background: var(--line-soft); overflow: hidden; position: relative; }
 .progress-bar { position: absolute; top: 0; bottom: 0; width: 30%; background: var(--accent); border-radius: 5px; animation: slide 1.6s ease-in-out infinite; }
 @keyframes slide { 0% { left: -30%; } 100% { left: 100%; } }
-@media (prefers-reduced-motion: reduce) { .progress-bar { animation: none; left: 0; width: 100%; opacity: 0.35; } }
+@media (prefers-reduced-motion: reduce) { .progress-bar { animation: none; left: 0; width: 30%; } }
 
 /* Report (Main.dc.html, Phone.dc.html) */
 .scan-details { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; font-size: 15px; color: var(--muted); }
@@ -206,6 +206,7 @@ h1, h2, h3 { font-family: var(--font-head); }
 .code-chip { background: var(--subtle); border-radius: 6px; padding: 2px 6px; color: var(--ink); margin-right: 4px; }
 .table-wrap { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; }
 table.data { width: 100%; border-collapse: collapse; font-size: 15px; }
+table.checks { min-width: 720px; }
 .data thead tr { background: var(--subtle); text-align: left; }
 .data th { padding: 12px 16px; font-weight: 600; font-size: 13px; color: var(--ink-2); text-align: left; }
 .data td { padding: 14px 16px; vertical-align: top; border-top: 1px solid var(--line-soft); }
@@ -224,11 +225,11 @@ table.data { width: 100%; border-collapse: collapse; font-size: 15px; }
 .pdf-form .field-row { align-items: flex-end; }
 .pdf-form .field { flex: 1 1 220px; }
 .pdf-form .field-label { font-size: 14px; }
-.pdf-form .input { flex: 1 1 220px; min-height: 48px; font-size: 16px; background: var(--panel-input); color: var(--panel-ink); border-color: var(--control); }
+.pdf-form .input { flex: none; width: 100%; min-height: 48px; font-size: 16px; background: var(--panel-input); color: var(--panel-ink); border-color: var(--control); }
 .pdf-form .input::placeholder { color: var(--panel-muted); }
 .pdf-form .input[aria-invalid="true"] { border: 2px solid var(--panel-bad); }
 .pdf-form .btn { min-height: 48px; background: var(--panel-action); color: var(--panel-on-action); }
-.pdf-form :focus-visible { outline-color: var(--panel-action); }
+.pdf-panel :focus-visible { outline-color: var(--panel-action); }
 .pdf-note { margin: 0; font-size: 13px; color: var(--panel-muted); }
 .pdf-msg { margin: 0; display: flex; gap: 8px; font-size: 15px; }
 .pdf-msg.bad { color: var(--panel-bad); }
@@ -240,10 +241,15 @@ table.data { width: 100%; border-collapse: collapse; font-size: 15px; }
 .actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .actions form { margin: 0; }
 .actions a { min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px; font-weight: 600; }
+.op-table { min-width: 860px; }
 .op-table td { padding: 12px 16px; }
+.op-table code { white-space: nowrap; }
+.actions { flex-wrap: nowrap; }
 .op-table td.actions-cell { padding: 8px 16px; }
 .nowrap { white-space: nowrap; }
-.grades { font-family: var(--font-mono); font-size: 14px; }
+.grades { font-size: 14px; min-width: 220px; }
+.grade-item { display: inline-block; margin-right: 10px; white-space: nowrap; }
+.grade-item abbr { text-decoration: none; color: var(--muted); }
 .signin-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 24px; align-items: start; }
 .signin-card { padding: 24px; display: flex; flex-direction: column; gap: 16px; border-radius: 16px; }
 .inline-code { background: var(--subtle); border-radius: 6px; padding: 2px 6px; }
@@ -280,6 +286,7 @@ table.data { width: 100%; border-collapse: collapse; font-size: 15px; }
   .checks tbody tr:first-child { border-top: 0; }
   .checks td { padding: 0; border: 0; }
   .checks td + td { margin-top: 6px; }
+  table.checks { min-width: 0; }
   .pdf-panel { padding: 20px; }
   .pdf-form .btn { width: 100%; }
 }

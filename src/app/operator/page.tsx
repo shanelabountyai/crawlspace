@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { BrandHeader } from "@/app/components/BrandBar";
-import { formatWhen, plainError } from "@/app/components/present";
+import { formatWhen } from "@/app/components/present";
+import { urlErrorText } from "@/lib/report/words";
 import { CATEGORIES, type Category } from "@/lib/checks/types";
 import { formatOutOf100, letterFor } from "@/lib/report/grade";
 import { getDb } from "@/server/db";
@@ -89,6 +90,7 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
                   autoComplete="current-password"
                   required
                   aria-invalid={err ? true : undefined}
+                  autoFocus={!!err}
                   aria-describedby={err ? "op-error" : undefined}
                 />
                 <button type="submit" className="btn btn-primary btn-lg">
@@ -116,7 +118,7 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
   const [scans, leads] = await Promise.all([listScans(getDb()), leadSvc.leads.list(50)]);
   const rerun = param("rerun");
   const error = param("error");
-  const errMsg = error ? plainError(error) : null;
+  const errMsg = urlErrorText(error);
   return (
     <>
       <BrandHeader
@@ -162,8 +164,7 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
               ✕
             </span>
             <span>
-              {errMsg.lead ? <strong>{errMsg.lead} </strong> : null}
-              {errMsg.detail}
+              <strong>Rerun not started.</strong> {errMsg}
             </span>
           </p>
         ) : null}
@@ -183,7 +184,7 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
                     <th scope="col">Site</th>
                     <th scope="col">Status</th>
                     <th scope="col">Score</th>
-                    <th scope="col">Grades</th>
+                    <th scope="col">Grades A–F</th>
                     <th scope="col">Leads</th>
                     <th scope="col">Actions</th>
                   </tr>
@@ -201,20 +202,28 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
                       <td className="nowrap">
                         <strong>{s.status === "done" ? formatOutOf100(s.overall) : ""}</strong>
                       </td>
-                      <td className="grades">{s.categories ? CATS.map((c) => `${c}:${letterFor(s.categories![c] ?? null)}`).join(" ") : ""}</td>
+                      <td className="grades">
+                        {s.categories
+                          ? CATS.map((c) => (
+                              <span key={c} className="grade-item">
+                                <abbr title={CATEGORIES[c]}>{CATEGORIES[c].split(" ")[0]}</abbr> <strong>{letterFor(s.categories![c] ?? null)}</strong>
+                              </span>
+                            ))
+                          : ""}
+                      </td>
                       <td data-testid="lead-count">{s.leadCount}</td>
                       <td className="actions-cell">
                         <div className="actions">
-                          <Link href={`/scans/${s.id}`} aria-label={`Report for ${s.url}`}>
+                          <Link href={`/scans/${s.id}`} aria-label={`Report for ${s.url}, ${formatWhen(s.createdAt)}`}>
                             Report
                           </Link>
                           {s.status === "done" ? (
-                            <a href={`/api/operator/scans/${s.id}/pdf`} download aria-label={`PDF for ${s.url}`}>
+                            <a href={`/api/operator/scans/${s.id}/pdf`} download aria-label={`PDF for ${s.url}, ${formatWhen(s.createdAt)}`}>
                               PDF
                             </a>
                           ) : null}
                           <form method="post" action={`/api/operator/scans/${s.id}/rerun`}>
-                            <button type="submit" className="btn btn-secondary">
+                            <button type="submit" className="btn btn-secondary" aria-label={`Rerun ${s.url}, ${formatWhen(s.createdAt)}`}>
                               Rerun
                             </button>
                           </form>

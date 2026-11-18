@@ -30,25 +30,9 @@ export function toneClass(score: number | null): string {
   return gradeTone(letterFor(score));
 }
 
-export const SITE_TYPE_WORD: Record<string, string> = { ecommerce: "Ecommerce", event: "Events and ticketing", other: "Other" };
-
-export const SITE_TYPE_SOURCE: Record<string, string> = {
-  override: "set for this scan",
-  "jsonld-raw": "detected from structured data",
-  "jsonld-rendered": "detected from structured data",
-  "page-kinds": "detected from the pages found",
-  default: "nothing more specific detected",
-};
+export { formatWhen, SITE_TYPE_SOURCE, SITE_TYPE_WORD } from "@/lib/report/words";
 
 export const LABEL_TEXT: Record<string, string> = { heuristic: "Heuristic", "proposed convention": "Proposed convention · low weight" };
-
-/** `Nov 18, 2026, 4:05 PM UTC`: fixed locale and zone, so server and client render the same text. */
-export function formatWhen(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  return `${new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" }).format(d)} UTC`;
-}
 
 /** Host for display; the full URL stays on the page elsewhere. */
 export function hostOf(url: string): string {
@@ -61,6 +45,15 @@ export function hostOf(url: string): string {
 
 const cap = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 
+/** A plain-words hint for the guard's technical refusals (D-62); the technical reason is still shown. */
+function hintFor(reason: string): string {
+  if (/private|loopback|link-local|reserved/i.test(reason)) return "We only scan public websites, so we didn't connect to it.";
+  if (/scheme .* not allowed/i.test(reason)) return "Use an address that starts with http:// or https://.";
+  if (/not a valid URL|could not resolve|has no addresses/i.test(reason)) return "Check the address; try one like yourstore.com.";
+  if (/credentials/i.test(reason)) return "Leave out the user name and password.";
+  return "";
+}
+
 /**
  * Server messages are terse ("refused: 10.0.0.1 is a private …"). Show them as a plain lead plus the reason,
  * keeping the reason's words exactly so nothing is invented.
@@ -69,7 +62,11 @@ export function plainError(message: string): { lead: string; detail: string } {
   const m = message.trim();
   const end = /[.!?]$/.test(m) ? "" : ".";
   // After a lead the reason is kept exactly as written (it often starts with a host or "robots.txt").
-  if (/^refused:\s*/i.test(m)) return { lead: "Not scanned.", detail: m.replace(/^refused:\s*/i, "") + end };
+  if (/^refused:\s*/i.test(m)) {
+    const reason = m.replace(/^refused:\s*/i, "") + end;
+    const hint = hintFor(reason);
+    return { lead: "Not scanned.", detail: hint ? `${hint} (${reason.replace(/\.$/, "")})` : reason };
+  }
   if (/^scan failed:\s*/i.test(m)) return { lead: "The scan failed.", detail: m.replace(/^scan failed:\s*/i, "") + end };
   return { lead: "", detail: cap(m) + end };
 }

@@ -34,6 +34,10 @@ export function ScanProgress({ id, status, host }: { id: string; status: "queued
   const queued = status === "queued";
   return (
     <section className="stack" aria-labelledby="progress-h" data-testid="scan-progress">
+      {/* Without JS the page reloads itself every 3 s, so "updates by itself" stays true (D-60). */}
+      <noscript>
+        <meta httpEquiv="refresh" content="3" />
+      </noscript>
       <p className="eyebrow">Scanning {host}</p>
       <h1 id="progress-h" className="title">
         {queued ? "Waiting for the scanner" : "Reading your site"}

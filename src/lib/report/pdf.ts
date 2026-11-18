@@ -4,6 +4,7 @@ import type { FixList } from "../fixlist/types";
 import type { Scorecard } from "../scan";
 import { BRAND } from "./brand";
 import { formatOutOf100, formatScore, gradeTone, letterFor, type Tone } from "./grade";
+import { FIX_SOURCE_TEXT, formatWhen, SITE_TYPE_SOURCE, SITE_TYPE_WORD } from "./words";
 
 /**
  * PDF export of a stored report (D-37): pdf-lib with the standard Helvetica fonts, drawn from the same data the
@@ -146,14 +147,16 @@ function drawFrame(w: Writer, input: PdfReportInput) {
   w.pages.forEach((page, i) => {
     page.drawRectangle({ x: 0, y: PAGE_H - BAND_H, width: PAGE_W, height: BAND_H, color: BAND });
     const baseline = PAGE_H - BAND_H / 2 - 4;
-    page.drawText(pdfSafe(BRAND.wordmark), { x: MARGIN, y: baseline, size: 11, font: w.bold, color: WHITE });
-    page.drawRectangle({ x: MARGIN, y: baseline - 5, width: w.bold.widthOfTextAtSize(pdfSafe(BRAND.wordmark), 11), height: 1.2, color: BAND_ACCENT });
+    // "Lab Intelligence / Crawlspace", as on the web header (PdfReport.dc.html)
+    page.drawText(pdfSafe(BRAND.company), { x: MARGIN, y: baseline, size: 11, font: w.bold, color: WHITE });
+    const trail = ` / ${BRAND.product}`;
+    page.drawText(trail, { x: MARGIN + w.bold.widthOfTextAtSize(pdfSafe(BRAND.company), 11), y: baseline, size: 11, font: w.bold, color: BAND_ACCENT });
     const right = pdfSafe(BRAND.tagline);
     page.drawText(right, { x: PAGE_W - MARGIN - w.font.widthOfTextAtSize(right, 9), y: baseline, size: 9, font: w.font, color: BAND_MUTED });
 
     page.drawLine({ start: { x: MARGIN, y: MARGIN + 22 }, end: { x: PAGE_W - MARGIN, y: MARGIN + 22 }, thickness: 0.5, color: LINE });
     const host = wrapText(input.finalUrl, w.font, 8, CONTENT_W - 80)[0] ?? "";
-    page.drawText(pdfSafe(`${BRAND.company} · ${BRAND.address}`), { x: MARGIN, y: MARGIN + 10, size: 8, font: w.font, color: MUTED });
+    page.drawText(pdfSafe(`${BRAND.wordmark} · ${BRAND.address}`), { x: MARGIN, y: MARGIN + 10, size: 8, font: w.font, color: MUTED });
     page.drawText(host, { x: MARGIN, y: MARGIN, size: 8, font: w.font, color: MUTED });
     const num = `Page ${i + 1} of ${total}`;
     page.drawText(num, { x: PAGE_W - MARGIN - w.font.widthOfTextAtSize(num, 8), y: MARGIN, size: 8, font: w.font, color: MUTED });
@@ -161,8 +164,7 @@ function drawFrame(w: Writer, input: PdfReportInput) {
 }
 
 function scannedOn(iso: string): string {
-  const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? iso : d.toUTCString();
+  return formatWhen(iso);
 }
 
 export async function renderReportPdf(input: PdfReportInput): Promise<Uint8Array> {
@@ -180,10 +182,10 @@ export async function renderReportPdf(input: PdfReportInput): Promise<Uint8Array
 
   const w = new Writer(doc, await doc.embedFont(StandardFonts.Helvetica), await doc.embedFont(StandardFonts.HelveticaBold));
 
-  // Title block
-  w.text(BRAND.tagline, { size: 20, bold: true, gap: 4 });
-  w.text(input.finalUrl, { size: 12, bold: true, color: ACCENT, gap: 4 });
-  w.text(`Scanned ${scannedOn(card.fetchedAt)} · site type ${card.siteType} (${card.siteTypeSource}) · rubric v${card.rubricVersion}`, { size: 9, color: MUTED, gap: 10 });
+  // Title block: the scanned URL is the title (PdfReport.dc.html); same words as the report page
+  w.text(input.finalUrl, { size: 18, bold: true, gap: 4 });
+  const siteType = `${SITE_TYPE_WORD[card.siteType] ?? card.siteType} (${SITE_TYPE_SOURCE[card.siteTypeSource] ?? card.siteTypeSource})`;
+  w.text(`Scanned ${scannedOn(card.fetchedAt)} · site type ${siteType} · rubric v${card.rubricVersion}`, { size: 9, color: MUTED, gap: 10 });
 
   // Overall: score box (PdfReport.dc.html). The readiness word follows the D-34 letter tone.
   w.ensure(90);
@@ -193,22 +195,24 @@ export async function renderReportPdf(input: PdfReportInput): Promise<Uint8Array
   const tone = gradeTone(letterFor(card.overall));
   w.text(formatOutOf100(card.overall), { size: 30, bold: true, color: INK, gap: 2, indent: 14 });
   w.text(READINESS[tone], { size: 11, bold: true, color: TONES[tone], gap: 10, indent: 14 });
+  // Category grades in a two-column grid inside the box, right of the score
+  const cats = Object.keys(CATEGORIES) as Category[];
+  const gx = MARGIN + 190;
+  const colW = (CONTENT_W - 190 - 10) / 2;
+  cats.forEach((k, i) => {
+    const score = card.categories[k];
+    const letter = letterFor(score);
+    const x = gx + (i % 2) * colW;
+    const y = boxTop - 26 - Math.floor(i / 2) * 20;
+    w.page.drawText(letter, { x, y, size: 11, font: w.bold, color: TONES[gradeTone(letter)] });
+    w.page.drawText(pdfSafe(CATEGORIES[k]), { x: x + 24, y, size: 9, font: w.font, color: INK });
+    const s = score === null ? "n/a" : `${formatScore(score)}/100`;
+    w.page.drawText(s, { x: x + 24, y: y - 9, size: 7.5, font: w.font, color: MUTED });
+  });
+  w.y = Math.min(w.y, boxTop - 26 - 2 * 20 - 16);
   w.page.drawRectangle({ x: MARGIN, y: w.y, width: CONTENT_W, height: boxTop - w.y, borderColor: LINE, borderWidth: 0.8 });
   w.y -= 12;
 
-  // Categories
-  w.text("Category grades", { size: 10, color: MUTED, gap: 4 });
-  for (const k of Object.keys(CATEGORIES) as Category[]) {
-    const score = card.categories[k];
-    const letter = letterFor(score);
-    w.ensure(18);
-    w.y -= 15;
-    w.page.drawText(letter, { x: MARGIN, y: w.y, size: 12, font: w.bold, color: TONES[gradeTone(letter)] });
-    w.page.drawText(pdfSafe(CATEGORIES[k]), { x: MARGIN + 36, y: w.y, size: 11, font: w.font, color: INK });
-    const s = score === null ? "no applicable checks" : `${formatScore(score)}/100`;
-    w.page.drawText(s, { x: MARGIN + 220, y: w.y, size: 11, font: w.font, color: MUTED });
-  }
-  w.y -= 6;
   w.text("Grades: A 90+, B 80+, C 70+, D 60+, F below 60. Checks that do not apply to this site are left out of the score.", { size: 8, color: MUTED });
 
   // Fix list
@@ -216,9 +220,7 @@ export async function renderReportPdf(input: PdfReportInput): Promise<Uint8Array
   if (fixList.items.length === 0) {
     w.text("Nothing to fix: every applicable check passed.");
   } else {
-    const source =
-      fixList.source === "llm" ? "Written by AI, checked against the scan evidence." : fixList.source === "mixed" ? "AI-written where it passed validation, standard fixes for the rest." : "Standard fixes for each failed or partial check.";
-    w.text(source, { size: 9, color: MUTED, gap: 6 });
+    w.text(`${FIX_SOURCE_TEXT[fixList.source]}.`, { size: 9, color: MUTED, gap: 6 });
     fixList.items.forEach((f, i) => {
       w.ensure(50);
       w.text(`${i + 1}. ${f.title}  [${f.checkId}]`, { size: 11, bold: true, gap: 2 });

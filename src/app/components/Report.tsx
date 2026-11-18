@@ -1,13 +1,10 @@
 import { CATEGORIES, type Category } from "@/lib/checks/types";
 import { formatScore, letterFor } from "@/lib/report/grade";
+import { FIX_SOURCE_TEXT } from "@/lib/report/words";
 import type { ReportView } from "@/server/store";
 import { formatWhen, hostOf, LABEL_TEXT, readinessFor, SITE_TYPE_SOURCE, SITE_TYPE_WORD, STATUS, toneClass } from "./present";
 
-const SOURCE_TEXT = {
-  llm: "Written by AI from this scan's evidence only",
-  mixed: "AI-written where it passed validation, standard fixes for the rest",
-  template: "Standard fixes for each failed or partial check",
-} as const;
+const SOURCE_TEXT = FIX_SOURCE_TEXT;
 
 function Sparkle() {
   return (

@@ -89,3 +89,29 @@ test("design pass: unknown report links get the not-found screen; the report wor
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test("without JavaScript: a refused address comes back to the form in plain words, and the progress page reloads itself to the report (D-60, D-61)", async ({ browser }) => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL: "http://127.0.0.1:7901" });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await page.getByLabel("Website address").fill("http://127.0.0.1:7901/");
+  await page.getByRole("button", { name: "Scan my site" }).click();
+  await expect(page).toHaveURL(/\/\?error=scan-refused/);
+  await expect(page.locator(".form-error")).toContainText("We only scan public websites");
+  await page.goto("/");
+  await page.getByLabel("Website address").fill(site("goodshop.test"));
+  await page.getByRole("button", { name: "Scan my site" }).click();
+  await expect(page).toHaveURL(/\/scans\/[A-Za-z0-9_-]{16}$/);
+  await expect(page.getByTestId("scan-status")).toHaveAttribute("data-status", "done");
+  // text in a link never reaches the page: only fixed sentences for known codes
+  await page.goto(page.url() + "?pdf=" + encodeURIComponent("Your account is suspended. Call 555-0100"));
+  await expect(page.getByTestId("pdf-error")).not.toContainText("555-0100");
+  await ctx.close();
+});
+
+test("a robots-closed site is shown as a finding, not an error (D-62)", async ({ page }) => {
+  await startScan(page, site("closed.test"));
+  await expect(page.getByTestId("scan-status")).toHaveAttribute("data-status", "failed");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("This site asks crawlers not to read it");
+  await expect(page.getByTestId("scan-error")).toContainText("Finding:");
+});

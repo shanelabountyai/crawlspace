@@ -1,8 +1,11 @@
+import { urlErrorText } from "@/lib/report/words";
 import { BrandHeader } from "./components/BrandBar";
 import { ScanForm } from "./components/ScanForm";
 
 /** Scan form (Form.dc.html desktop, PhoneForm.dc.html at 390 px). */
-export default function Home() {
+export default async function Home({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
+  const sp = await searchParams;
+  const error = urlErrorText(typeof sp.error === "string" ? sp.error : null); // no-JS form post refused (D-61)
   return (
     <>
       <BrandHeader />
@@ -11,7 +14,7 @@ export default function Home() {
           <h1 className="display">Can AI agents shop, book or buy on your site?</h1>
           <p className="lede">Paste your website. Usually in under a minute you&apos;ll get a score out of 100, a grade for each of six areas and a ranked list of fixes. Free, no account.</p>
         </div>
-        <ScanForm />
+        <ScanForm initialError={error} />
         <div className="info-grid">
           <section className="card info-card" aria-labelledby="does-h">
             <h2 id="does-h">What the scan does</h2>

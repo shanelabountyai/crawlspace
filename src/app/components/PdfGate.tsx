@@ -14,6 +14,7 @@ export function PdfGate({ id, initialError }: { id: string; initialError?: strin
 
   async function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (busy) return; // aria-disabled keeps focus on the button (D-63)
     const email = String(new FormData(e.currentTarget).get("email") ?? "");
     setBusy(true);
     setError(null);
@@ -50,7 +51,7 @@ export function PdfGate({ id, initialError }: { id: string; initialError?: strin
         <h2 id="pdf-h">Take this report to your team</h2>
         <p>The report above is free either way. Leave your email to download the full PDF, with every check and its evidence, ready to forward to your developer.</p>
       </div>
-      <form className="pdf-form" method="post" action={`/api/scans/${id}/pdf`} onSubmit={onSubmit}>
+      <form className="pdf-form" method="post" action={`/api/scans/${id}/pdf`} onSubmit={onSubmit} noValidate>
         <div className="field-row">
           <div className="field">
             <label htmlFor="pdf-email" className="field-label">
@@ -66,10 +67,11 @@ export function PdfGate({ id, initialError }: { id: string; initialError?: strin
               required
               maxLength={254}
               aria-invalid={invalid ? true : undefined}
+              autoFocus={!!initialError}
               aria-describedby={msg ? "pdf-note pdf-error" : "pdf-note"}
             />
           </div>
-          <button type="submit" className="btn" disabled={busy}>
+          <button type="submit" className="btn" aria-disabled={busy || undefined}>
             {busy ? "Preparing…" : "Download PDF"}
           </button>
         </div>

@@ -1,4 +1,5 @@
 import AxeBuilder from "@axe-core/playwright";
+// Scans here use walledshop/closed only: e2e/phase4.spec.ts counts the goodshop rows in the shared e2e database.
 import { expect, test, type Page } from "@playwright/test";
 
 // Design pass (D-59): WCAG 2.1 AA checks with axe on every screen, light and dark, plus a keyboard-only pass.
@@ -36,7 +37,7 @@ test("axe: scan form, its refusal, the report, the PDF gate error, a stopped sca
   await scan(page, site("walledshop.test"), "done");
   await axe(page, "report");
   const id = page.url().split("/").pop()!;
-  await page.goto(`/scans/${id}?pdf=${encodeURIComponent("enter a valid email address to download the PDF")}`);
+  await page.goto(`/scans/${id}?pdf=pdf-email`);
   await expect(page.getByTestId("pdf-error")).toBeVisible();
   await axe(page, "report with PDF gate error");
 
@@ -69,7 +70,7 @@ test("keyboard only: skip link, then the form, then a scan starts with Enter; fo
   await expect(page.getByLabel("Website address")).toBeFocused();
   const outline = await page.getByLabel("Website address").evaluate((el) => getComputedStyle(el).outlineStyle);
   expect(outline).not.toBe("none");
-  await page.keyboard.type(site("goodshop.test"));
+  await page.keyboard.type(site("walledshop.test"));
   await page.keyboard.press("Tab");
   await expect(page.getByRole("button", { name: "Scan my site" })).toBeFocused();
   await page.keyboard.press("Enter");
@@ -85,6 +86,24 @@ test("touch targets: every button, link-button and text field on the report and 
       els.filter((e) => (e as HTMLElement).offsetParent !== null && e.getBoundingClientRect().height < 44).map((e) => e.outerHTML.slice(0, 80)),
     );
   expect(await small()).toEqual([]);
-  await scan(page, site("goodshop.test"), "done");
+  await scan(page, site("walledshop.test"), "done");
   expect(await small()).toEqual([]);
+});
+
+test("review fixes (D-60..D-63): the PDF field is a normal 48 px box inside its panel; the designed invalid-email state shows; the report is announced", async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 800 });
+  await scan(page, site("walledshop.test"), "done");
+  await expect(page.getByTestId("scan-announce")).toContainText("Report ready. Agent-readiness score");
+  await expect(page).toHaveTitle(/^Report ready: walledshop\.test:7911/);
+  const input = page.getByLabel("Work email");
+  const box = (await input.boundingBox())!;
+  expect(box.height).toBeGreaterThanOrEqual(44);
+  expect(box.height).toBeLessThanOrEqual(56);
+  const panel = (await page.getByTestId("pdf-gate").boundingBox())!;
+  expect(box.x + box.width).toBeLessThanOrEqual(panel.x + panel.width);
+  await input.fill("not-an-email");
+  await page.getByRole("button", { name: "Download PDF" }).click();
+  await expect(page.getByTestId("pdf-error")).toContainText("Check the address.");
+  await expect(input).toHaveAttribute("aria-invalid", "true");
+  await expect(page.getByRole("button", { name: "Download PDF" })).toBeFocused();
 });

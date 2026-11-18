@@ -22,7 +22,7 @@ export function BrandHeader({ trail, action }: { trail?: string; action?: ReactN
       </a>
       <header className="site-header" data-testid="brand-header">
         <div className="site-header-inner">
-          <Link href="/" className="brand" aria-label={`${BRAND.wordmark}: new scan`}>
+          <Link href="/" className="brand">
             <Mark />
             <span className="brand-name">{BRAND.company}</span>
             <span className="brand-trail">
@@ -41,7 +41,7 @@ export function BrandFooter() {
   return (
     <footer className="site-footer" data-testid="brand-footer">
       <div className="site-footer-inner">
-        <p>CrawlspaceBot/0.1 read up to 15 public pages at one request per second and obeyed robots.txt. It never submits forms, logs in, or reads private addresses.</p>
+        <p>CrawlspaceBot/0.1 reads up to 15 public pages at one request per second and obeys robots.txt. It never submits forms, logs in, or reads private addresses.</p>
         <p>
           A {BRAND.company} tool. Scores describe how an AI agent sees a site at the time of the scan; they are not a ranking of the business.
         </p>
