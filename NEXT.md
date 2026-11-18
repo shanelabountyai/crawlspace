@@ -19,8 +19,10 @@ page, PDF export, deploy notes"). Phases 1–4 of PRD §8 are built; nothing is 
 
 ## Review run (scheduled, 2026-11-18)
 
-An independent review of the PR found **0 must-fix, 7 should-fix, 7 nits**; no code was changed (D-44). Gate re-run on
-5360a42: `npm ci` (Prisma schema-engine stubbed, D-26), lint, typecheck, `npm test` 334/334, build, e2e 7/7 — all exit 0.
+An independent review of the PR found 0 must-fix, 7 should-fix, 7 nits (D-44). CI then exposed **1 must-fix the review
+missed**, now fixed: scan ids starting with "-" (≈ 1 in 64) were exported as `'-…` by the CSV formula guard, so
+`scan_id` in the CSVs matched no scan (D-46; `newScanId()` no longer emits a leading "-"; test in `csv.test.ts`). Gate re-run on
+5360a42: `npm ci` (Prisma schema-engine stubbed, D-26), lint, typecheck, `npm test` 335/335 after the fix, build, e2e 7/7 — all exit 0.
 CI on b200f46: pull_request run green, push run red on a CS-02 timing race in Phase 2 code (999 ms gap; D-45, fix in
 its own PR). Should-fix, to do before any deploy:
 

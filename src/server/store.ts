@@ -47,9 +47,15 @@ export function summariseCrawl(report: CrawlReport): CrawlSummary {
   };
 }
 
-/** URL-safe, unguessable scan id (reports are private by link). */
+/**
+ * URL-safe, unguessable scan id (reports are private by link). Never starts with "-", so the CSV formula guard
+ * leaves it alone and exported ids match stored ones exactly (D-46). Existing ids still match `SCAN_ID_RE`.
+ */
 export function newScanId(): string {
-  return randomBytes(12).toString("base64url");
+  for (;;) {
+    const id = randomBytes(12).toString("base64url");
+    if (id[0] !== "-") return id;
+  }
 }
 
 export const SCAN_ID_RE = /^[A-Za-z0-9_-]{16}$/;
