@@ -1,16 +1,11 @@
 import { CATEGORIES, type Category } from "@/lib/checks/types";
+import { formatScore, gradeTone, letterFor } from "@/lib/report/grade";
 import type { ReportView } from "@/server/store";
 
 const STATUS_TEXT = { pass: "Pass", partial: "Partial", fail: "Fail", "not-applicable": "N/A" } as const;
 
-function scoreClass(v: number | null): string {
-  if (v === null) return "score-na";
-  if (v >= 85) return "score-good";
-  if (v >= 60) return "score-mid";
-  return "score-bad";
-}
-
-const fmt = (v: number | null) => (v === null ? "n/a" : v.toFixed(1));
+/** Colour follows the letter grade (D-34). */
+const scoreClass = (v: number | null) => `score-${gradeTone(letterFor(v))}`;
 
 export function Report({ report, scannedAt }: { report: ReportView; scannedAt: string | null }) {
   const { scorecard: card, fixList, crawl } = report;
@@ -20,7 +15,8 @@ export function Report({ report, scannedAt }: { report: ReportView; scannedAt: s
     <div className="report">
       <section className="summary" aria-label="Score">
         <div className={`overall ${scoreClass(card.overall)}`} data-testid="overall-score">
-          <span className="overall-num">{fmt(card.overall)}</span>
+          <span className="overall-num">{formatScore(card.overall)}</span>
+          {card.overall === null ? null : <span className="overall-outof">/100</span>}
           <span className="overall-label">overall</span>
         </div>
         <div>
@@ -30,13 +26,20 @@ export function Report({ report, scannedAt }: { report: ReportView; scannedAt: s
             {scannedAt ? <> · scanned {new Date(scannedAt).toUTCString()}</> : null}
           </p>
           <ul className="categories">
-            {(Object.keys(CATEGORIES) as Category[]).map((k) => (
-              <li key={k} className={scoreClass(card.categories[k])} data-testid={`category-${k}`}>
-                <span className="cat-name">{CATEGORIES[k]}</span>
-                <span className="cat-score">{fmt(card.categories[k])}</span>
-              </li>
-            ))}
+            {(Object.keys(CATEGORIES) as Category[]).map((k) => {
+              const letter = letterFor(card.categories[k]);
+              return (
+                <li key={k} className={scoreClass(card.categories[k])} data-testid={`category-${k}`} data-grade={letter}>
+                  <span className="cat-grade" aria-label={`grade ${letter}`}>
+                    {letter}
+                  </span>
+                  <span className="cat-name">{CATEGORIES[k]}</span>
+                  <span className="cat-score">{formatScore(card.categories[k])}</span>
+                </li>
+              );
+            })}
           </ul>
+          <p className="meta grade-key">Grades: A 90+, B 80+, C 70+, D 60+, F below 60. Checks that do not apply are left out of the score.</p>
         </div>
       </section>
 

@@ -20,9 +20,9 @@ afterAll(async () => {
 });
 
 describe("SQLite storage via Prisma", () => {
-  it("applies the committed migration once", () => {
+  it("applies the committed migrations once, in order", () => {
     const file = join(dir, "m.db");
-    expect(migrate(file)).toEqual(["20261116000000_init"]);
+    expect(migrate(file)).toEqual(["20261116000000_init", "20261118000000_leads"]);
     expect(migrate(file)).toEqual([]);
   });
 
