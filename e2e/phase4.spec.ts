@@ -10,7 +10,7 @@ const PASSWORD = "crawlspace-demo-operator";
 async function scanDone(page: Page, url: string): Promise<string> {
   await page.goto("/");
   await page.getByLabel("Website address").fill(url);
-  await page.getByRole("button", { name: "Scan site" }).click();
+  await page.getByRole("button", { name: "Scan my site" }).click();
   await expect(page).toHaveURL(/\/scans\/[A-Za-z0-9_-]{16}$/);
   await expect(page.getByTestId("scan-status")).toHaveAttribute("data-status", "done");
   return page.url().split("/").pop()!;
@@ -26,7 +26,7 @@ async function signIn(page: Page) {
 test("report shows the overall score over 100, a letter per category and Lab Intelligence branding; the report itself is not gated", async ({ page }) => {
   await scanDone(page, site("walledshop.test"));
   const overall = page.getByTestId("overall-score");
-  await expect(overall.locator(".overall-outof")).toHaveText("/100");
+  await expect(overall.locator(".overall-outof")).toHaveText("/ 100");
   const score = Number(await overall.locator(".overall-num").textContent());
   for (const c of ["A", "B", "C", "D", "E", "F"]) {
     const cat = page.getByTestId(`category-${c}`);
@@ -35,8 +35,8 @@ test("report shows the overall score over 100, a letter per category and Lab Int
     await expect(cat.locator(".cat-grade")).toHaveText(grade!);
   }
   expect(score).toBeGreaterThan(0);
+  await expect(page.getByTestId("brand-header")).toContainText("Lab Intelligence");
   await expect(page.getByTestId("brand-header")).toContainText("Crawlspace");
-  await expect(page.getByTestId("brand-header")).toContainText("by Lab Intelligence");
   await expect(page.getByTestId("brand-footer")).toContainText("9905 S Pennsylvania Ave, Oklahoma City, OK 73159");
   // free report: checks and fixes are on the page with no email asked
   await expect(page.getByTestId("checks").locator("tbody tr")).toHaveCount(18);
@@ -59,7 +59,7 @@ test("PDF download goes through the email gate and stores the lead; the operator
   await expect(page.getByTestId("pdf-error")).toContainText("valid email");
 
   // The gate in the UI
-  await page.getByLabel("Email address").fill("demo-visitor@example.com");
+  await page.getByLabel("Work email").fill("demo-visitor@example.com");
   const downloading = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download PDF" }).click();
   const download = await downloading;
@@ -84,7 +84,7 @@ test("PDF download goes through the email gate and stores the lead; the operator
   await expect(page.getByTestId("operator-login")).toBeVisible();
   await page.getByLabel("Password").fill("wrong password!!");
   await page.getByRole("button", { name: "Sign in" }).click();
-  await expect(page.locator("p.form-error")).toContainText("Wrong password");
+  await expect(page.locator(".form-error")).toContainText("Wrong password");
   await signIn(page);
 
   // See the scan with its two leads, and the leads with HubSpot off
@@ -93,7 +93,7 @@ test("PDF download goes through the email gate and stores the lead; the operator
   await expect(row).toContainText("/100");
   await expect(row.getByTestId("lead-count")).toHaveText("2");
   await expect(page.getByTestId("operator-leads")).toContainText("demo-visitor@example.com");
-  await expect(page.getByTestId("operator-leads")).toContainText("off");
+  await expect(page.getByTestId("operator-leads")).toContainText("Off");
   await expect(page.getByTestId("operator")).toContainText("HubSpot lead capture: off");
 
   // Export: leads CSV, scans CSV, the operator's ungated PDF

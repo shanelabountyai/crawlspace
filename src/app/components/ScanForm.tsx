@@ -2,7 +2,9 @@
 
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
+import { plainError } from "./present";
 
+/** Scan form (Form.dc.html, PhoneForm.dc.html). Posts natively without JS; with JS shows refusals in place. */
 export function ScanForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
@@ -28,16 +30,41 @@ export function ScanForm() {
     }
   }
 
+  const msg = error ? plainError(error) : null;
   return (
-    <form className="scan-form" method="post" action="/api/scans" onSubmit={onSubmit} noValidate>
-      <label htmlFor="url">Website address</label>
-      <div className="scan-form-row">
-        <input id="url" name="url" type="text" inputMode="url" autoComplete="url" placeholder="yourshop.com" required spellCheck={false} />
-        <button type="submit" disabled={busy}>{busy ? "Starting…" : "Scan site"}</button>
+    <form className="scan-form" method="post" action="/api/scans" onSubmit={onSubmit} noValidate aria-describedby={msg ? "scan-error" : undefined}>
+      <div className="field">
+        <label htmlFor="url" className="field-label">
+          Website address
+        </label>
+        <div className="field-row">
+          <input
+            id="url"
+            className="input"
+            name="url"
+            type="text"
+            inputMode="url"
+            autoComplete="url"
+            placeholder="yourstore.com"
+            required
+            spellCheck={false}
+            aria-invalid={msg ? true : undefined}
+            aria-describedby={msg ? "scan-error" : undefined}
+          />
+          <button type="submit" className="btn btn-primary btn-lg" disabled={busy}>
+            {busy ? "Starting…" : "Scan my site"}
+          </button>
+        </div>
       </div>
-      {error ? (
-        <p className="form-error" role="alert">
-          {error}
+      {msg ? (
+        <p className="callout bad form-error" role="alert" id="scan-error">
+          <span className="callout-glyph" aria-hidden="true">
+            ✕
+          </span>
+          <span>
+            {msg.lead ? <strong>{msg.lead} </strong> : null}
+            {msg.detail}
+          </span>
         </p>
       ) : null}
     </form>

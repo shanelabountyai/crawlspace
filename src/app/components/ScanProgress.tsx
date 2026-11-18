@@ -3,8 +3,11 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
-/** Polls the scan until it is done or failed, then re-renders the server page. */
-export function ScanProgress({ id, status }: { id: string; status: "queued" | "running" }) {
+/**
+ * Scan progress (Progress.dc.html, ScanOutcomes.dc.html). Polls the scan until it is done or failed, then re-renders
+ * the server page. The app does not record pages while a scan runs (D-29), so the bar is indeterminate (D-50).
+ */
+export function ScanProgress({ id, status, host }: { id: string; status: "queued" | "running"; host: string }) {
   const router = useRouter();
   useEffect(() => {
     let stop = false;
@@ -28,13 +31,24 @@ export function ScanProgress({ id, status }: { id: string; status: "queued" | "r
     };
   }, [id, status, router]);
 
+  const queued = status === "queued";
   return (
-    <div className="progress" role="status" aria-live="polite">
-      <span className="spinner" aria-hidden="true" />
-      <div>
-        <strong>{status === "queued" ? "Waiting for the scanner…" : "Scanning…"}</strong>
-        <p>Crawlspace reads up to 15 pages, one request per second, and renders them in a sandboxed browser. This usually takes under a minute.</p>
+    <section className="stack" aria-labelledby="progress-h" data-testid="scan-progress">
+      <p className="eyebrow">Scanning {host}</p>
+      <h1 id="progress-h" className="title">
+        {queued ? "Waiting for the scanner" : "Reading your site"}
+      </h1>
+      <div role="status" aria-live="polite" className="stack-sm">
+        <p className="body-2">
+          {queued
+            ? "One scan runs at a time. Yours starts as soon as the one ahead finishes; this page updates by itself."
+            : "We read up to 15 pages, one a second, so we never slow your site down. This usually takes under a minute; you can keep this tab in the background."}
+        </p>
       </div>
-    </div>
+      <div className="progress-track" role="progressbar" aria-label="Scan progress" aria-valuetext={queued ? "Waiting" : "Reading pages"}>
+        <span className="progress-bar" />
+      </div>
+      <p className="meta">If robots.txt blocks CrawlspaceBot, we stop and show that as a result. It&apos;s a finding, not an error.</p>
+    </section>
   );
 }

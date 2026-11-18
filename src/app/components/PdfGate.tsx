@@ -1,9 +1,10 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { plainError } from "./present";
 
 /**
- * The email gate in front of the PDF download (D-35, D-38). The on-screen report above stays free.
+ * The email gate in front of the PDF download (D-35, D-38; LeadStates.dc.html). The on-screen report stays free.
  * Without JS the form posts natively and the browser downloads the PDF; errors come back as `?pdf=<message>`.
  */
 export function PdfGate({ id, initialError }: { id: string; initialError?: string | null }) {
@@ -41,28 +42,58 @@ export function PdfGate({ id, initialError }: { id: string; initialError?: strin
     }
   }
 
+  const msg = error ? plainError(error) : null;
+  const invalid = !!error && /email/i.test(error);
   return (
-    <section className="pdf-gate" aria-labelledby="pdf-h" data-testid="pdf-gate">
-      <h2 id="pdf-h">Download this report as a PDF</h2>
-      <form method="post" action={`/api/scans/${id}/pdf`} onSubmit={onSubmit}>
-        <label htmlFor="pdf-email">Email address</label>
-        <div className="scan-form-row">
-          <input id="pdf-email" name="email" type="email" autoComplete="email" placeholder="you@company.com" required maxLength={254} />
-          <button type="submit" disabled={busy}>{busy ? "Preparing…" : "Download PDF"}</button>
+    <section className="pdf-panel" aria-labelledby="pdf-h" data-testid="pdf-gate">
+      <div className="pdf-copy">
+        <h2 id="pdf-h">Take this report to your team</h2>
+        <p>The report above is free either way. Leave your email to download the full PDF, with every check and its evidence, ready to forward to your developer.</p>
+      </div>
+      <form className="pdf-form" method="post" action={`/api/scans/${id}/pdf`} onSubmit={onSubmit}>
+        <div className="field-row">
+          <div className="field">
+            <label htmlFor="pdf-email" className="field-label">
+              Work email
+            </label>
+            <input
+              id="pdf-email"
+              className="input"
+              name="email"
+              type="email"
+              autoComplete="email"
+              placeholder="you@company.com"
+              required
+              maxLength={254}
+              aria-invalid={invalid ? true : undefined}
+              aria-describedby={msg ? "pdf-note pdf-error" : "pdf-note"}
+            />
+          </div>
+          <button type="submit" className="btn" disabled={busy}>
+            {busy ? "Preparing…" : "Download PDF"}
+          </button>
         </div>
-        <p className="meta fine-print">
-          The report above is free either way. Your email is stored with this scan so Lab Intelligence can follow up about it. It is never shown on a public page.
+        {msg ? (
+          <p className="pdf-msg bad form-error" role="alert" id="pdf-error" data-testid="pdf-error">
+            <span aria-hidden="true">✕</span>
+            <span>
+              <strong>{invalid ? "Check the address." : "Not now."}</strong> {msg.detail}
+            </span>
+          </p>
+        ) : null}
+        <div role="status">
+          {done ? (
+            <p className="pdf-msg good" data-testid="pdf-done">
+              <span aria-hidden="true">✓</span>
+              <span>
+                <strong>Done.</strong> Your PDF is downloading.
+              </span>
+            </p>
+          ) : null}
+        </div>
+        <p className="pdf-note" id="pdf-note">
+          Your email is stored with this scan so Lab Intelligence can follow up about it. It is never shown on a public page.
         </p>
-        {error ? (
-          <p className="form-error" role="alert" data-testid="pdf-error">
-            {error}
-          </p>
-        ) : null}
-        {done ? (
-          <p className="meta" role="status" data-testid="pdf-done">
-            Your PDF is downloading.
-          </p>
-        ) : null}
       </form>
     </section>
   );
