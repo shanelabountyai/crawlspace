@@ -23,8 +23,8 @@ An independent review of the PR found 0 must-fix, 7 should-fix, 7 nits (D-44). C
 missed**, now fixed: scan ids starting with "-" (≈ 1 in 64) were exported as `'-…` by the CSV formula guard, so
 `scan_id` in the CSVs matched no scan (D-46; `newScanId()` no longer emits a leading "-"; test in `csv.test.ts`). Gate re-run on
 5360a42: `npm ci` (Prisma schema-engine stubbed, D-26), lint, typecheck, `npm test` 335/335 after the fix, build, e2e 7/7 — all exit 0.
-CI on b200f46: pull_request run green, push run red on a CS-02 timing race in Phase 2 code (999 ms gap; D-45, fix in
-its own PR). Should-fix, to do before any deploy:
+CI on b200f46: pull_request run green, push run red on a CS-02 timing race in Phase 2 code (999 ms gap; D-45). Fixed
+on this PR (D-47): the limiter returns the granted start time and the fetcher logs it. Should-fix, to do before any deploy:
 
 1. Login limiter: `blocked()` runs before the body is read and `fail()` after, so concurrent requests skip the 10/15 min
    limit (`src/app/api/operator/login/route.ts:15-23`).
