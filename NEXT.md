@@ -17,6 +17,22 @@ page, PDF export, deploy notes"). Phases 1–4 of PRD §8 are built; nothing is 
 - `docs/DEPLOY.md`: runtime needs, three options with the work each needs, a pre-launch checklist (D-43).
 - README: status, env vars, demo script (the Phase 4 gate); `npm run demo`.
 
+## Review run (scheduled, 2026-11-18)
+
+An independent review of the PR found **0 must-fix, 7 should-fix, 7 nits**; no code was changed (D-44). Gate re-run on
+5360a42: `npm ci` (Prisma schema-engine stubbed, D-26), lint, typecheck, `npm test` 334/334, build, e2e 7/7 — all exit 0.
+Should-fix, to do before any deploy:
+
+1. Login limiter: `blocked()` runs before the body is read and `fail()` after, so concurrent requests skip the 10/15 min
+   limit (`src/app/api/operator/login/route.ts:15-23`).
+2. Login limiter is one global counter checked before the password: anyone can keep the operator locked out.
+3. `/scans/<id>?pdf=<text>` shows arbitrary text in the alert box on the branded page (escaped, not XSS); use error codes.
+   Same pattern on `/operator?error=`.
+4. PDF-gate rate limit is count-then-insert without a transaction; concurrent posts can exceed 10/scan/hour.
+5. Session token is HMAC keyed directly by the password: a stolen cookie allows an offline dictionary attack.
+6. `single-path.test.ts` allowlist widened to include `hubspot.ts` (D-42): needs the owner's explicit OK.
+7. No test drives the login route's 429 path; the PDF "deterministic bytes" test compares extracted text, not bytes.
+
 ## Owner hand steps
 
 1. Review the PR; run the README **Demo script** locally (`npm ci && npm run demo`).
