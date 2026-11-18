@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scan outcomes</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>body{margin:0;background:#F7F7F4}a{color:#0F5E63}</style>
+</helmet>
+<!-- Gap design (2026-11-18, design pass): what the report URL shows when there is no report. Found while comparing
+     the routes with the artboards: a scan that stopped (robots.txt, unreachable, refused at connect), a scan that is
+     waiting in the queue, an unknown report link, and the report's "nothing to fix" state. Progress here has no page
+     list: the app does not record pages while a scan runs (D-29), so the bar is indeterminate. -->
+<div style="width: 1280px; box-sizing: border-box; padding: 40px; background: #F7F7F4; color: #16181D; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;">
+<section aria-labelledby="f-h" style="display: flex; flex-direction: column; gap: 14px;">
+<span style="font-size: 15px; color: #565B66;">[https://site.example/]</span>
+<h1 id="f-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;">This scan stopped</h1>
+<div role="alert" style="display: flex; gap: 12px; background: #FCE6DD; color: #7A2509; border-radius: 12px; padding: 14px 16px; font-size: 15px;"><span aria-hidden="true" style="font-weight: 700;">✕</span><span><strong>Not scanned.</strong> [robots.txt disallows CrawlspaceBot from /; not scanning]</span></div>
+<p style="margin: 0; color: #3E434D; font-size: 15px;">If robots.txt blocks CrawlspaceBot, that is a finding, not an error: agents that obey robots.txt cannot read this site either.</p>
+<a href="#" style="align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; padding: 0 20px; border-radius: 10px; background: #0F5E63; color: #FFFFFF; font-weight: 600; text-decoration: none;">Scan another site</a>
+</section>
+<section aria-labelledby="q-h" style="display: flex; flex-direction: column; gap: 14px;">
+<span style="font-size: 15px; color: #565B66;">Scanning [https://site.example/]</span>
+<h1 id="q-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;">Waiting for the scanner</h1>
+<p style="margin: 0; color: #3E434D;">One scan runs at a time. Yours starts as soon as the one ahead finishes; this page updates by itself.</p>
+<div role="progressbar" aria-label="Scan progress" style="height: 10px; border-radius: 5px; background: #E4E4DE; overflow: hidden;"><div style="height: 10px; width: 30%; background: #0F5E63;"></div></div>
+<p style="margin: 0; font-size: 14px; color: #565B66;">Indeterminate bar (no page count is recorded while a scan runs); it stands still when reduced motion is on.</p>
+</section>
+<section aria-labelledby="n-h" style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+<h1 id="n-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;">We can't find that report</h1>
+<p style="margin: 0; color: #3E434D;">Report links are private and hard to guess. Check the link you were given, or scan the site again.</p>
+<a href="#" style="align-self: flex-start; min-height: 44px; display: inline-flex; align-items: center; padding: 0 20px; border-radius: 10px; background: #0F5E63; color: #FFFFFF; font-weight: 600; text-decoration: none;">Scan a site</a>
+</section>
+<section aria-labelledby="z-h" style="display: flex; flex-direction: column; gap: 12px;">
+<h2 id="z-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Fix these first</h2>
+<div style="display: flex; gap: 12px; background: #E6EEF9; color: #1D4F91; border-radius: 12px; padding: 14px 16px; font-size: 15px;"><span aria-hidden="true" style="font-weight: 700;">✓</span><span><strong>Nothing to fix.</strong> Every applicable check passed.</span></div>
+<span style="font-size: 13px; font-weight: 600; color: #565B66; text-transform: uppercase; letter-spacing: 0.06em;">Scan form refusal (real message)</span>
+<div role="alert" style="display: flex; gap: 12px; background: #FCE6DD; color: #7A2509; border-radius: 12px; padding: 14px 16px; font-size: 15px;"><span aria-hidden="true" style="font-weight: 700;">✕</span><span><strong>Not scanned.</strong> [127.0.0.1 is a private, loopback, link-local or reserved address]</span></div>
+</section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

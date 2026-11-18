@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Operator</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F4}
+a{color:#0F5E63}a:hover{color:#0A4347}
+</style>
+</helmet>
+<!-- Gap design (2026-11-18, design pass): operator page, signed in. PRD §2 "Shane (operator): sees submitted scans, reruns them, exports"; D-39, D-40. Every value is a [placeholder]. -->
+<div style="min-height: 100%; background: #F7F7F4; color: #16181D; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+<header style="background: #FFFFFF; border-bottom: 1px solid #D9D9D2;">
+<div style="max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="7" fill="#16181D"/><path d="M9 7v11a3 3 0 0 0 3 3h7" stroke="#7FD1CF" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="19" cy="9" r="2.4" fill="#7FD1CF"/></svg>
+<span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px;">Lab Intelligence</span>
+<span style="color: #565B66; font-size: 15px;">/ Crawlspace / Operator</span>
+</div>
+<form><button type="button" style="min-height: 44px; padding: 0 16px; border-radius: 10px; border: 1px solid #8A8F99; background: #FFFFFF; color: #16181D; font: inherit; font-weight: 600; font-size: 15px;">Sign out</button></form>
+</div>
+</header>
+<main style="max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 28px;">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;">Submitted scans</h1>
+<span style="font-size: 15px; color: #565B66;">[N] scans, newest first (up to 200) · HubSpot lead capture: <strong style="color: #16181D;">[off]</strong></span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+<a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: 10px; background: #0F5E63; color: #FFFFFF; font-weight: 600; text-decoration: none; font-size: 15px;">Export scans (CSV)</a>
+<a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 16px; border-radius: 10px; border: 1px solid #8A8F99; background: #FFFFFF; color: #16181D; font-weight: 600; text-decoration: none; font-size: 15px;">Export leads (CSV)</a>
+</div>
+</div>
+<div role="status" style="display: flex; gap: 12px; align-items: flex-start; background: #E6EEF9; color: #1D4F91; border-radius: 12px; padding: 14px 16px; font-size: 15px;">
+<span aria-hidden="true" style="font-weight: 700;">✓</span>
+<span><strong>Rerun queued.</strong> The old scan is kept. <a href="#" style="color: #1D4F91; font-weight: 600;">Open the new scan</a></span>
+</div>
+<section aria-labelledby="scans-h" style="display: flex; flex-direction: column; gap: 12px;">
+<h2 id="scans-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Scans</h2>
+<div style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px; overflow-x: auto;">
+<table style="width: 100%; border-collapse: collapse; font-size: 15px; min-width: 860px;">
+<thead><tr style="background: #F0F0EB; text-align: left;">
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Created</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Site</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Status</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Score</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Grades A–F</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Leads</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Actions</th>
+</tr></thead>
+<tbody>
+<sc-for list="{{rows}}" as="r" hint-placeholder-count="3">
+<tr style="border-top: 1px solid #E4E4DE;">
+<td style="padding: 12px 16px; white-space: nowrap; color: #3E434D;">{{r.when}}</td>
+<td style="padding: 12px 16px; overflow-wrap: anywhere;"><code style="font-family: ui-monospace, Menlo, monospace; font-size: 14px;">{{r.url}}</code></td>
+<td style="padding: 12px 16px; white-space: nowrap;"><span style="display: inline-flex; align-items: center; gap: 6px; background: {{r.bg}}; color: {{r.fg}}; border-radius: 999px; padding: 3px 10px; font-weight: 600; font-size: 14px;"><span aria-hidden="true">{{r.g}}</span>{{r.status}}</span></td>
+<td style="padding: 12px 16px; white-space: nowrap; font-weight: 600;">{{r.score}}</td>
+<td style="padding: 12px 16px; font-family: ui-monospace, Menlo, monospace; font-size: 14px;">{{r.grades}}</td>
+<td style="padding: 12px 16px;">{{r.leads}}</td>
+<td style="padding: 8px 16px;"><div style="display: flex; flex-wrap: wrap; gap: 8px; align-items: center;">
+<a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px; font-weight: 600;">Report</a>
+<a href="#" style="min-height: 44px; display: inline-flex; align-items: center; padding: 0 8px; font-weight: 600;">PDF</a>
+<button type="button" style="min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #8A8F99; background: #FFFFFF; color: #16181D; font: inherit; font-weight: 600; font-size: 14px;">Rerun</button>
+</div></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+<p style="margin: 0; font-size: 14px; color: #565B66;">Empty state: "No scans yet. Scans appear here as visitors submit them."</p>
+</section>
+<section aria-labelledby="leads-h" style="display: flex; flex-direction: column; gap: 12px;">
+<h2 id="leads-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Latest leads</h2>
+<div style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px; overflow-x: auto;">
+<table style="width: 100%; border-collapse: collapse; font-size: 15px; min-width: 640px;">
+<thead><tr style="background: #F0F0EB; text-align: left;">
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">When</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Email</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">Scan</th>
+<th scope="col" style="padding: 12px 16px; font-size: 13px; color: #3E434D;">HubSpot</th>
+</tr></thead>
+<tbody>
+<tr style="border-top: 1px solid #E4E4DE;"><td style="padding: 12px 16px; color: #3E434D;">[YYYY-MM-DD HH:MM UTC]</td><td style="padding: 12px 16px;">[email]</td><td style="padding: 12px 16px;"><a href="#">[scan URL]</a></td><td style="padding: 12px 16px;"><span style="display: inline-flex; gap: 6px; background: #EEEEEA; color: #565B66; border-radius: 999px; padding: 3px 10px; font-weight: 600; font-size: 14px;"><span aria-hidden="true">–</span>Off</span></td></tr>
+</tbody>
+</table>
+</div>
+<p style="margin: 0; font-size: 14px; color: #565B66;">HubSpot status per lead: Off (– grey) · Sent (✓ blue) · Failed (✕ red, reason in text beside it). Empty state: "No emails yet."</p>
+</section>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1100}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const st = {
+      done: { status: 'Done', g: '✓', bg: '#E6EEF9', fg: '#1D4F91' },
+      running: { status: 'Running', g: '●', bg: '#E7F2F2', fg: '#0F5E63' },
+      failed: { status: 'Failed', g: '✕', bg: '#FCE6DD', fg: '#9A2E0B' }
+    };
+    const rows = [
+      ['done', '[score]/100', 'A:[x] B:[x] C:[x] D:[x] E:[x] F:[x]', '[n]'],
+      ['running', '', '', '0'],
+      ['failed', '', '', '0']
+    ].map(([s, score, grades, leads]) => ({ when: '[YYYY-MM-DD HH:MM UTC]', url: '[https://site.example/]', score, grades, leads, ...st[s] }));
+    return { rows };
+  }
+}
+</script>
+</body>
+</html>

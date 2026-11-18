@@ -32,6 +32,19 @@ Each file is a self-contained Design Component: HTML with inline styles, `{{hole
 
 Design each gap as a new `docs/design/<Name>.dc.html` in the same look before building it.
 
+### Gap designs added by the design pass (2026-11-18)
+
+| File | Screen | Frame | Covers |
+| --- | --- | --- | --- |
+| `Operator.dc.html` | Operator page, signed in | 1280×1100 | scan list, status words, grades, lead count, rerun, CSV export, leads, empty states |
+| `OperatorSignIn.dc.html` | Operator sign-in and states | 1280×780 | password form, wrong password, locked out, page turned off |
+| `LeadStates.dc.html` | PDF email gate states | 1280×1200 | ready, preparing, done, invalid email, too many requests |
+| `ScanOutcomes.dc.html` | Report URL without a report | 1280×900 | scan stopped (robots/refused), waiting in queue, unknown link, nothing to fix, form refusal |
+| `PdfReport.dc.html` | PDF report, page 1 | 794×1123 (A4) | header band, score, grades, fixes, checks, footer with address and page numbers |
+
+Found beyond the HANDOFF list: the failed/refused scan, queued scan, unknown report (404) and "nothing to fix" states (`ScanOutcomes`).
+
+
 ## Placeholders
 
 The northwind-outfitters.example scan is sample data for layout only.
