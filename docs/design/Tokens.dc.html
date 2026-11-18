@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crawlspace tokens</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>body{margin:0}</style>
+</helmet>
+<div style="width: 1280px; height: 780px; box-sizing: border-box; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); font-family: Inter, system-ui, sans-serif;">
+<sc-for list="{{modes}}" as="m" hint-placeholder-count="2">
+<div style="background: {{m.bg}}; color: {{m.ink}}; padding: 40px; display: flex; flex-direction: column; gap: 22px;">
+<div style="display: flex; justify-content: space-between; align-items: baseline;">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; letter-spacing: -0.01em;">{{m.name}}</span>
+<span style="font-size: 14px; color: {{m.mu}};">Lab Intelligence · Crawlspace</span>
+</div>
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px;">
+<sc-for list="{{m.sw}}" as="s" hint-placeholder-count="6">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<div style="height: 52px; border-radius: 10px; background: {{s.v}}; border: 1px solid {{m.ln}};"></div>
+<span style="font-size: 13px; font-weight: 600;">{{s.k}}</span>
+<span style="font-size: 12px; color: {{m.mu}}; font-family: ui-monospace, Menlo, monospace;">{{s.v}}</span>
+</div>
+</sc-for>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<sc-for list="{{m.st}}" as="t" hint-placeholder-count="4">
+<span style="display: inline-flex; align-items: center; gap: 6px; background: {{t.bg}}; color: {{t.fg}}; border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 14px;"><span aria-hidden="true">{{t.g}}</span>{{t.w}}</span>
+</sc-for>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; border-top: 1px solid {{m.ln}}; padding-top: 18px;">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 40px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em;">64 / 100</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Space Grotesk 24 / 600 — headings</span>
+<span style="font-size: 17px;">Inter 17 / 400 — body, plain English for owners.</span>
+<span style="font-size: 13px; color: {{m.mu}};">Inter 13 — labels, evidence, meta. Type scale 13 · 15 · 17 · 20 · 24 · 30 · 40 · 88.</span>
+</div>
+<span style="font-size: 13px; color: {{m.mu}};">Status is a word, then a glyph, then a colour. Text pairs ≥ 4.5:1, control borders ≥ 3:1. Space on a 4 px grid; radius 10 / 14 / 16.</span>
+</div>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":780}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const modes = [
+      { name: 'Light', bg: '#F7F7F4', ink: '#16181D', mu: '#565B66', ln: '#D9D9D2',
+        sw: [{ k: 'Page', v: '#F7F7F4' }, { k: 'Surface', v: '#FFFFFF' }, { k: 'Ink', v: '#16181D' }, { k: 'Muted text', v: '#565B66' }, { k: 'Control border', v: '#8A8F99' }, { k: 'Accent (links, action)', v: '#0F5E63' }],
+        st: [{ w: 'Pass', g: '✓', bg: '#E6EEF9', fg: '#1D4F91' }, { w: 'Partial', g: '◐', bg: '#FBF0DA', fg: '#6B4100' }, { w: 'Fail', g: '✕', bg: '#FCE6DD', fg: '#9A2E0B' }, { w: 'Not applicable', g: '–', bg: '#EEEEEA', fg: '#565B66' }] },
+      { name: 'Dark', bg: '#121418', ink: '#ECEDEA', mu: '#A9ADB5', ln: '#2F333B',
+        sw: [{ k: 'Page', v: '#121418' }, { k: 'Surface', v: '#1B1E24' }, { k: 'Ink', v: '#ECEDEA' }, { k: 'Muted text', v: '#A9ADB5' }, { k: 'Control border', v: '#6E737D' }, { k: 'Accent (links, action)', v: '#7FD1CF' }],
+        st: [{ w: 'Pass', g: '✓', bg: '#1E2C44', fg: '#A9C6F2' }, { w: 'Partial', g: '◐', bg: '#3A2D12', fg: '#F2D29A' }, { w: 'Fail', g: '✕', bg: '#41231A', fg: '#F5B39C' }, { w: 'Not applicable', g: '–', bg: '#262A31', fg: '#B3B6BD' }] }
+    ];
+    return { modes };
+  }
+}
+</script>
+</body>
+</html>

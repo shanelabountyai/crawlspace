@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Crawlspace report</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F4}
+a{color:#0F5E63}a:hover{color:#0A4347}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F7F7F4; color: #16181D; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+
+<header style="background: #FFFFFF; border-bottom: 1px solid #D9D9D2;">
+<div style="max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;">
+<div style="display: flex; align-items: center; gap: 10px;">
+<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="7" fill="#16181D"/><path d="M9 7v11a3 3 0 0 0 3 3h7" stroke="#7FD1CF" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="19" cy="9" r="2.4" fill="#7FD1CF"/></svg>
+<span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px; letter-spacing: -0.01em;">Lab Intelligence</span>
+<span style="color: #565B66; font-size: 15px;">/ Crawlspace</span>
+</div>
+<a href="Form.dc.html" style="font-weight: 600; font-size: 15px; text-decoration: none; padding: 10px 16px; border: 1px solid #8A8F99; border-radius: 10px; color: #16181D; background: #FFFFFF; min-height: 44px; box-sizing: border-box; display: inline-flex; align-items: center;">Scan another site</a>
+</div>
+</header>
+
+<main style="max-width: 1120px; margin: 0 auto; padding: 32px 24px 64px; display: flex; flex-direction: column; gap: 32px;">
+
+<section aria-label="Scan details" style="display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline; font-size: 15px; color: #565B66;">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600; color: #16181D;">northwind-outfitters.example</span>
+<span>Site type: <strong style="color: #16181D;">Ecommerce</strong> (detected) · <a href="Form.dc.html">change</a></span>
+<span>12 of 15 pages read · Nov 17, 2026, 10:41 AM CT</span>
+<span>Sample scan</span>
+</section>
+
+<section aria-labelledby="score-h" style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 16px; padding: 28px; display: flex; flex-wrap: wrap; gap: 32px; align-items: center;">
+<div style="flex: 0 0 auto; display: flex; flex-direction: column; gap: 4px;">
+<h1 id="score-h" style="margin: 0; font-size: 15px; font-weight: 600; color: #565B66; text-transform: uppercase; letter-spacing: 0.06em;">Agent-readiness score</h1>
+<div style="display: flex; align-items: baseline; gap: 6px;">
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 88px; font-weight: 700; line-height: 1; letter-spacing: -0.03em;">64</span>
+<span style="font-size: 24px; color: #565B66; font-weight: 500;">/ 100</span>
+</div>
+<span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 6px; background: #FBF0DA; color: #6B4100; border-radius: 999px; padding: 4px 12px; font-weight: 600; font-size: 15px;"><span aria-hidden="true">◐</span> Partly ready</span>
+</div>
+<div style="flex: 1 1 360px; min-width: 0; display: flex; flex-direction: column; gap: 12px;">
+<p style="margin: 0; font-size: 18px; line-height: 1.5;">AI shopping agents can reach your store and read most product pages, but your prices and stock load only after JavaScript runs, and nothing tells an agent what your site offers. Fix the three items below first.</p>
+<p style="margin: 0; font-size: 15px; color: #565B66;">Two checks did not apply to this site and are left out of the score, not counted as passes.</p>
+</div>
+</section>
+
+<section aria-labelledby="cat-h" style="display: flex; flex-direction: column; gap: 14px;">
+<h2 id="cat-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Score by category</h2>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px;">
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="6">
+<div style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 8px;">
+<div style="display: flex; justify-content: space-between; align-items: center;">
+<span style="font-size: 13px; font-weight: 600; color: #565B66;">{{c.key}}</span>
+<span style="font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700; line-height: 1; color: {{c.fg}};">{{c.grade}}</span>
+</div>
+<span style="font-weight: 600; font-size: 16px; line-height: 1.3;">{{c.name}}</span>
+<div style="height: 6px; border-radius: 3px; background: #ECECE6; overflow: hidden;"><div style="height: 6px; width: {{c.pct}}; background: {{c.fg}};"></div></div>
+<span style="font-size: 14px; color: #565B66;">{{c.score}} / 100 · {{c.word}}</span>
+</div>
+</sc-for>
+</div>
+<p style="margin: 0; font-size: 14px; color: #565B66;">Grades: A 90–100 · B 75–89 · C 60–74 · D 45–59 · F below 45.</p>
+</section>
+
+<section aria-labelledby="fix-h" style="display: flex; flex-direction: column; gap: 14px;">
+<div style="display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px;">
+<h2 id="fix-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Fix these first</h2>
+<span style="display: inline-flex; align-items: center; gap: 6px; font-size: 14px; color: #3E434D; background: #EEEEEA; border-radius: 999px; padding: 4px 12px;"><svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"><path d="M7 1l1.6 3.6L12 6l-3.4 1.4L7 11 5.4 7.4 2 6l3.4-1.4z" fill="none" stroke="#3E434D" stroke-width="1.3" stroke-linejoin="round"/></svg>Written by AI from this scan's evidence only</span>
+</div>
+<ol style="margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px;">
+<sc-for list="{{fixes}}" as="f" hint-placeholder-count="3">
+<li style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px; padding: 18px 20px; display: flex; gap: 16px; align-items: flex-start;">
+<span style="flex: 0 0 auto; width: 36px; height: 36px; border-radius: 10px; background: #16181D; color: #FFFFFF; font-family: 'Space Grotesk', sans-serif; font-weight: 700; display: flex; align-items: center; justify-content: center;">{{f.n}}</span>
+<div style="flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 6px;">
+<span style="font-weight: 600; font-size: 17px;">{{f.title}}</span>
+<span style="font-size: 15px; color: #3E434D;">{{f.why}}</span>
+<span style="font-size: 14px; color: #565B66;">Evidence: <code style="font-family: ui-monospace, Menlo, monospace; font-size: 13px; background: #F0F0EB; border-radius: 6px; padding: 2px 6px; color: #16181D;">{{f.ev}}</code> · Check {{f.check}}</span>
+</div>
+<span style="flex: 0 0 auto; font-size: 13px; font-weight: 600; color: #565B66; white-space: nowrap;">{{f.gain}}</span>
+</li>
+</sc-for>
+</ol>
+</section>
+
+<section aria-labelledby="chk-h" style="display: flex; flex-direction: column; gap: 14px;">
+<h2 id="chk-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Every check</h2>
+<div style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px; overflow-x: auto;">
+<table style="width: 100%; border-collapse: collapse; font-size: 15px; min-width: 720px;">
+<thead>
+<tr style="background: #F0F0EB; text-align: left;">
+<th scope="col" style="padding: 12px 16px; font-weight: 600; font-size: 13px; color: #3E434D;">Check</th>
+<th scope="col" style="padding: 12px 16px; font-weight: 600; font-size: 13px; color: #3E434D;">Result</th>
+<th scope="col" style="padding: 12px 16px; font-weight: 600; font-size: 13px; color: #3E434D;">Evidence</th>
+</tr>
+</thead>
+<tbody>
+<sc-for list="{{checks}}" as="k" hint-placeholder-count="8">
+<tr style="border-top: 1px solid #E4E4DE;">
+<td style="padding: 14px 16px; vertical-align: top;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-weight: 500; color: {{k.ink}};">{{k.cat}} · {{k.name}}</span>
+<sc-if value="{{k.label}}" hint-placeholder-val="{{false}}"><span style="align-self: flex-start; font-size: 12px; font-weight: 600; color: #3E434D; border: 1px dashed #8A8F99; border-radius: 6px; padding: 1px 6px;">{{k.label}}</span></sc-if>
+</div>
+</td>
+<td style="padding: 14px 16px; vertical-align: top; white-space: nowrap;"><span style="display: inline-flex; align-items: center; gap: 6px; background: {{k.bg}}; color: {{k.fg}}; border-radius: 999px; padding: 3px 10px; font-weight: 600; font-size: 14px;"><span aria-hidden="true">{{k.glyph}}</span>{{k.word}}</span></td>
+<td style="padding: 14px 16px; vertical-align: top; color: {{k.ink2}};"><code style="font-family: ui-monospace, Menlo, monospace; font-size: 13px;">{{k.ev}}</code></td>
+</tr>
+</sc-for>
+</tbody>
+</table>
+</div>
+</section>
+
+<section aria-labelledby="pdf-h" style="background: #16181D; color: #F4F4EF; border-radius: 16px; padding: 28px; display: flex; flex-wrap: wrap; gap: 24px; align-items: flex-end;">
+<div style="flex: 1 1 340px; display: flex; flex-direction: column; gap: 8px;">
+<h2 id="pdf-h" style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Take this report to your team</h2>
+<p style="margin: 0; color: #C9CBD1;">Everything above stays free on this page. Leave your email and we'll send the full PDF, with every check and its evidence, ready to forward to your developer.</p>
+</div>
+<form style="flex: 1 1 360px; display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px;">
+<label for="pdf-email" style="font-size: 14px; font-weight: 600;">Work email</label>
+<input id="pdf-email" type="email" placeholder="you@company.com" style="min-height: 48px; box-sizing: border-box; border-radius: 10px; border: 1px solid #8A8F99; background: #22252C; color: #F4F4EF; padding: 0 14px; font: inherit;">
+</div>
+<button type="button" style="min-height: 48px; padding: 0 20px; border-radius: 10px; border: none; background: #7FD1CF; color: #0E1A1B; font: inherit; font-weight: 600; cursor: pointer;">Email me the PDF</button>
+</form>
+</section>
+
+<footer style="display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #565B66; border-top: 1px solid #D9D9D2; padding-top: 20px;">
+<p style="margin: 0;">CrawlspaceBot/0.1 read up to 15 public pages at one request per second and obeyed your robots.txt. It never submits forms, logs in, or reads private addresses.</p>
+<p style="margin: 0;">A Lab Intelligence tool. Scores describe how an AI agent sees your site today; they are not a ranking of your business.</p>
+</footer>
+
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":2280}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const tone = {
+      pass: { bg: '#E6EEF9', fg: '#1D4F91', glyph: '✓', word: 'Pass' },
+      partial: { bg: '#FBF0DA', fg: '#6B4100', glyph: '◐', word: 'Partial' },
+      fail: { bg: '#FCE6DD', fg: '#9A2E0B', glyph: '✕', word: 'Fail' },
+      na: { bg: '#EEEEEA', fg: '#565B66', glyph: '–', word: 'Not applicable' }
+    };
+    const grade = (s) => s >= 90 ? 'A' : s >= 75 ? 'B' : s >= 60 ? 'C' : s >= 45 ? 'D' : 'F';
+    const gradeFg = (s) => s >= 75 ? '#1D4F91' : s >= 60 ? '#6B4100' : '#9A2E0B';
+    const word = (s) => s >= 75 ? 'Ready' : s >= 45 ? 'Partly ready' : 'Not ready';
+    const cats = [
+      ['A', 'Access', 92], ['B', 'Readable without JavaScript', 48], ['C', 'Structured data', 71],
+      ['D', 'Machine guidance', 30], ['E', 'Actionability', 66], ['F', 'Speed', 81]
+    ].map(([key, name, score]) => ({ key: key + ' · ' + name.split(' ')[0], name, score, grade: grade(score), fg: gradeFg(score), pct: score + '%', word: word(score) }));
+    const checks = [
+      ['A', 'robots.txt lets AI agents in', 'pass', '/robots.txt line 4: Allow: /'],
+      ['A', 'No bot wall on product pages', 'pass', '12 of 12 pages returned 200'],
+      ['B', 'Price visible without JavaScript', 'fail', '/products/trail-jacket: .price is empty in raw HTML'],
+      ['B', 'Stock status visible without JavaScript', 'partial', '5 of 9 product pages show stock in raw HTML'],
+      ['C', 'Product schema on product pages', 'partial', 'JSON-LD Product on 6 of 9; missing offers.price on 3'],
+      ['C', 'Event schema on event pages', 'na', 'No event pages found on an ecommerce site'],
+      ['D', 'llms.txt present', 'fail', '/llms.txt returned 404', 'Proposed convention · low weight'],
+      ['D', 'Sitemap lists product pages', 'pass', '/sitemap.xml: 214 product URLs'],
+      ['E', 'Guest checkout reachable', 'partial', 'Cart reachable; checkout asks to sign in first', 'Heuristic'],
+      ['E', 'Add-to-cart is a real button', 'pass', 'button[name=add] on 9 of 9 product pages'],
+      ['F', 'Largest content loads under 2.5 s', 'pass', 'Median 1.9 s across 12 pages'],
+      ['F', 'Ticketing widget loads without login', 'na', 'No ticketing widget on this site']
+    ].map(([cat, name, r, ev, label]) => {
+      const t = tone[r];
+      const na = r === 'na';
+      return { cat, name, ev, label: label || '', bg: t.bg, fg: t.fg, glyph: t.glyph, word: t.word, ink: na ? '#565B66' : '#16181D', ink2: na ? '#6B6F78' : '#3E434D' };
+    });
+    const fixes = [
+      { n: '1', title: 'Put prices and stock in the page itself, not only in JavaScript', why: 'Agents that do not run JavaScript see an empty price box, so they skip your products when comparing.', ev: '.price empty on /products/trail-jacket', check: 'B1', gain: 'Up to +14' },
+      { n: '2', title: 'Add the missing price to your product schema', why: 'Three product pages describe the item but not what it costs, which is the first thing a shopping agent reads.', ev: 'offers.price missing on 3 of 9', check: 'C1', gain: 'Up to +8' },
+      { n: '3', title: 'Let shoppers reach checkout without an account', why: 'Agents acting for a buyer cannot create an account, so they stop at your sign-in page.', ev: 'checkout redirects to /account/login', check: 'E1', gain: 'Up to +6' }
+    ];
+    return { cats, checks, fixes, false: false };
+  }
+}
+</script>
+</body>
+</html>

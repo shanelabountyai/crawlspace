@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scan a site</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F4}
+a{color:#0F5E63}a:hover{color:#0A4347}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F7F7F4; color: #16181D; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+<header style="background: #FFFFFF; border-bottom: 1px solid #D9D9D2;">
+<div style="max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 10px;">
+<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="7" fill="#16181D"/><path d="M9 7v11a3 3 0 0 0 3 3h7" stroke="#7FD1CF" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="19" cy="9" r="2.4" fill="#7FD1CF"/></svg>
+<span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px;">Lab Intelligence</span>
+<span style="color: #565B66; font-size: 15px;">/ Crawlspace</span>
+</div>
+</header>
+<main style="max-width: 760px; margin: 0 auto; padding: 56px 24px 64px; display: flex; flex-direction: column; gap: 28px;">
+<div style="display: flex; flex-direction: column; gap: 12px;">
+<h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 40px; font-weight: 700; line-height: 1.1; letter-spacing: -0.02em;">Can AI agents shop, book or buy on your site?</h1>
+<p style="margin: 0; font-size: 18px; color: #3E434D;">Paste your website. In about a minute you'll get a score out of 100, a grade for each of six areas, and the three fixes that matter most. Free, no account.</p>
+</div>
+<form style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; flex-direction: column; gap: 6px;">
+<label for="url" style="font-weight: 600; font-size: 15px;">Website address</label>
+<div style="display: flex; flex-wrap: wrap; gap: 10px;">
+<input id="url" type="url" value="northwind-outfitters.example" style="flex: 1 1 320px; min-height: 52px; box-sizing: border-box; border-radius: 10px; border: 1px solid #8A8F99; padding: 0 16px; font: inherit; font-size: 17px; color: #16181D; background: #FFFFFF;">
+<a href="Progress.dc.html" style="flex: 0 0 auto; min-height: 52px; box-sizing: border-box; display: inline-flex; align-items: center; padding: 0 24px; border-radius: 10px; background: #0F5E63; color: #FFFFFF; font-weight: 600; text-decoration: none;">Scan my site</a>
+</div>
+</div>
+<fieldset style="border: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px;">
+<legend style="font-weight: 600; font-size: 15px; padding: 0; margin-bottom: 8px;">What kind of site is it? <span style="font-weight: 400; color: #565B66;">We'll detect it; change it if we're wrong.</span></legend>
+<div style="display: flex; flex-wrap: wrap; gap: 8px;">
+<label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 2px solid #0F5E63; background: #E7F2F2; font-weight: 600;"><input type="radio" name="kind" checked style="accent-color: #0F5E63;">Ecommerce <span style="font-weight: 400; color: #3E434D; font-size: 14px;">(detected)</span></label>
+<label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #8A8F99; background: #FFFFFF;"><input type="radio" name="kind" style="accent-color: #0F5E63;">Events and ticketing</label>
+<label style="display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 14px; border-radius: 10px; border: 1px solid #8A8F99; background: #FFFFFF;"><input type="radio" name="kind" style="accent-color: #0F5E63;">Something else</label>
+</div>
+</fieldset>
+</form>
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px;">
+<div style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-weight: 600;">What the scan does</span>
+<ul style="margin: 0; padding-left: 18px; color: #3E434D; font-size: 15px; display: flex; flex-direction: column; gap: 4px;">
+<li>Reads up to 15 public pages, one per second</li>
+<li>Reads each page the way an agent does, with and without JavaScript</li>
+<li>Follows your robots.txt, as CrawlspaceBot/0.1</li>
+</ul>
+</div>
+<div style="background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 8px;">
+<span style="font-weight: 600;">What it never does</span>
+<ul style="margin: 0; padding-left: 18px; color: #3E434D; font-size: 15px; display: flex; flex-direction: column; gap: 4px;">
+<li>Submit forms, add to cart or check out</li>
+<li>Log in or read pages behind an account</li>
+<li>Scan private or internal addresses</li>
+</ul>
+</div>
+</div>
+<div role="alert" style="display: flex; gap: 12px; align-items: flex-start; background: #FCE6DD; color: #7A2509; border-radius: 12px; padding: 14px 16px; font-size: 15px;">
+<span aria-hidden="true" style="font-weight: 700;">✕</span>
+<span><strong>Example refusal:</strong> "192.168.1.20 is a private address, so we didn't connect to it. Try your public website address."</span>
+</div>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":780}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
