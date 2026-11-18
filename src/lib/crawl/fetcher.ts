@@ -90,8 +90,8 @@ export class Fetcher {
       await assertAllowed(url, this.opts.guard); // refuse before any connection (CS-03)
       this.take(kind); // a redirect hop is a request and counts (CS-02)
       const host = new URL(url).host;
-      await this.limiter.acquire(host);
-      const entry: RequestLogEntry = { method: "GET", url, kind, startedAt: this.clock.now() };
+      const startedAt = await this.limiter.acquire(host); // the granted slot (D-47)
+      const entry: RequestLogEntry = { method: "GET", url, kind, startedAt };
       this.log.push(entry);
       const t0 = performance.now();
       let res;

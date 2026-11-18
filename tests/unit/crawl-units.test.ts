@@ -36,6 +36,26 @@ describe("HostRateLimiter", () => {
     await Promise.all([1, 2, 3, 4].map(() => rl.acquire("a.example").then(() => starts.push(clock.now()))));
     expect(starts).toEqual([0, 1000, 2000, 3000]);
   });
+  it("resolves with the granted start, and the next grant is a full interval after it (D-47)", async () => {
+    // A tick lands between a grant and any later clock read; the fetcher logs the grant, not a fresh read.
+    let t = 0;
+    let tickAfterGrant = true;
+    const clock: Clock = {
+      now: () => {
+        const v = t;
+        if (tickAfterGrant) t += 1;
+        return v;
+      },
+      sleep: async (ms) => void (t += ms),
+    };
+    const rl = new HostRateLimiter(1000, clock);
+    const first = await rl.acquire("a.example");
+    const freshRead = clock.now(); // 1 ms after the grant
+    tickAfterGrant = false;
+    const second = await rl.acquire("a.example");
+    expect(second - first).toBeGreaterThanOrEqual(1000);
+    expect(second - freshRead).toBeLessThan(1000); // logging a fresh read would have shown this short gap (CI: 999 ms)
+  });
   it("does not make different hosts wait for each other", async () => {
     const clock = fakeClock();
     const rl = new HostRateLimiter(1000, clock);

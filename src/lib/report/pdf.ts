@@ -1,0 +1,270 @@
+import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFPage } from "pdf-lib";
+import { CATEGORIES, type Category } from "../checks/types";
+import type { FixList } from "../fixlist/types";
+import type { Scorecard } from "../scan";
+import { BRAND } from "./brand";
+import { formatOutOf100, formatScore, gradeTone, letterFor, type Tone } from "./grade";
+
+/**
+ * PDF export of a stored report (D-37): pdf-lib with the standard Helvetica fonts, drawn from the same data the
+ * report page shows. Pure: no network, no clock (dates come from the scan), so the same report gives the same bytes.
+ */
+export interface PdfReportInput {
+  finalUrl: string;
+  scorecard: Scorecard;
+  fixList: FixList;
+  crawl: { pageRequests: number; assetRequests: number; blockedBrowserRequests: number; skipped: { url: string; reason: string }[]; notes: string[] };
+}
+
+const PAGE_W = 595.28; // A4
+const PAGE_H = 841.89;
+const MARGIN = 50;
+const CONTENT_W = PAGE_W - 2 * MARGIN;
+const TOP = PAGE_H - MARGIN - 18; // below the running header
+const BOTTOM = MARGIN + 34; // above the footer
+
+const INK = rgb(0.11, 0.12, 0.13);
+const MUTED = rgb(0.37, 0.38, 0.4);
+const LINE = rgb(0.85, 0.84, 0.8);
+const ACCENT = rgb(0.18, 0.36, 0.31);
+const TONES: Record<Tone, ReturnType<typeof rgb>> = {
+  good: rgb(0.12, 0.48, 0.27),
+  mid: rgb(0.6, 0.42, 0),
+  bad: rgb(0.7, 0.15, 0.12),
+  na: rgb(0.42, 0.44, 0.46),
+};
+const STATUS_TEXT = { pass: "Pass", partial: "Partial", fail: "Fail", "not-applicable": "N/A" } as const;
+const STATUS_TONE = { pass: "good", partial: "mid", fail: "bad", "not-applicable": "na" } as const;
+
+const REPLACEMENTS: [RegExp, string][] = [
+  [/[‘’‚′]/g, "'"],
+  [/[“”„″]/g, '"'],
+  [/[–—−]/g, "-"],
+  [/…/g, "..."],
+  [/→/g, "->"],
+  [/←/g, "<-"],
+  [/≤/g, "<="],
+  [/≥/g, ">="],
+  [/•/g, "-"],
+  [/[   ]/g, " "],
+  [/[\t\r\n]+/g, " "],
+];
+
+/** Standard PDF fonts only encode Latin-1-ish text; anything else becomes `?` instead of throwing (D-37). */
+export function pdfSafe(text: string): string {
+  let t = text;
+  for (const [re, to] of REPLACEMENTS) t = t.replace(re, to);
+  return t.replace(/[^\x20-\x7E\xA1-\xFF]/g, "?");
+}
+
+/** Split text into lines that fit `width` at `size`. Long unbroken tokens (URLs) are cut by character. */
+export function wrapText(text: string, font: PDFFont, size: number, width: number): string[] {
+  const words = pdfSafe(text).split(" ").filter((w) => w.length > 0);
+  const lines: string[] = [];
+  let line = "";
+  const fits = (s: string) => font.widthOfTextAtSize(s, size) <= width;
+  for (let word of words) {
+    const candidate = line ? `${line} ${word}` : word;
+    if (fits(candidate)) {
+      line = candidate;
+      continue;
+    }
+    if (line) lines.push(line);
+    line = "";
+    while (!fits(word)) {
+      let n = word.length - 1;
+      while (n > 1 && !fits(word.slice(0, n))) n--;
+      lines.push(word.slice(0, n));
+      word = word.slice(n);
+    }
+    line = word;
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [""];
+}
+
+class Writer {
+  page!: PDFPage;
+  y = TOP;
+  readonly pages: PDFPage[] = [];
+  constructor(
+    readonly doc: PDFDocument,
+    readonly font: PDFFont,
+    readonly bold: PDFFont,
+  ) {
+    this.newPage();
+  }
+
+  newPage() {
+    this.page = this.doc.addPage([PAGE_W, PAGE_H]);
+    this.pages.push(this.page);
+    this.y = TOP;
+  }
+
+  ensure(height: number) {
+    if (this.y - height < BOTTOM) this.newPage();
+  }
+
+  text(text: string, opts: { size?: number; bold?: boolean; color?: ReturnType<typeof rgb>; indent?: number; gap?: number } = {}) {
+    const size = opts.size ?? 10;
+    const font = opts.bold ? this.bold : this.font;
+    const indent = opts.indent ?? 0;
+    const lh = size * 1.35;
+    for (const line of wrapText(text, font, size, CONTENT_W - indent)) {
+      this.ensure(lh);
+      this.y -= lh;
+      this.page.drawText(line, { x: MARGIN + indent, y: this.y, size, font, color: opts.color ?? INK });
+    }
+    this.y -= opts.gap ?? 2;
+  }
+
+  heading(text: string) {
+    this.ensure(40);
+    this.y -= 14;
+    this.text(text, { size: 14, bold: true, color: ACCENT, gap: 6 });
+  }
+
+  rule() {
+    this.ensure(10);
+    this.y -= 4;
+    this.page.drawLine({ start: { x: MARGIN, y: this.y }, end: { x: PAGE_W - MARGIN, y: this.y }, thickness: 0.5, color: LINE });
+    this.y -= 6;
+  }
+}
+
+function drawFrame(w: Writer, input: PdfReportInput) {
+  const total = w.pages.length;
+  w.pages.forEach((page, i) => {
+    page.drawText(pdfSafe(BRAND.wordmark), { x: MARGIN, y: PAGE_H - MARGIN, size: 9, font: w.bold, color: ACCENT });
+    const right = pdfSafe(BRAND.tagline);
+    page.drawText(right, { x: PAGE_W - MARGIN - w.font.widthOfTextAtSize(right, 9), y: PAGE_H - MARGIN, size: 9, font: w.font, color: MUTED });
+    page.drawLine({ start: { x: MARGIN, y: PAGE_H - MARGIN - 6 }, end: { x: PAGE_W - MARGIN, y: PAGE_H - MARGIN - 6 }, thickness: 0.5, color: LINE });
+
+    page.drawLine({ start: { x: MARGIN, y: MARGIN + 22 }, end: { x: PAGE_W - MARGIN, y: MARGIN + 22 }, thickness: 0.5, color: LINE });
+    const host = wrapText(input.finalUrl, w.font, 8, CONTENT_W - 80)[0] ?? "";
+    page.drawText(pdfSafe(`${BRAND.company} · ${BRAND.address}`), { x: MARGIN, y: MARGIN + 10, size: 8, font: w.font, color: MUTED });
+    page.drawText(host, { x: MARGIN, y: MARGIN, size: 8, font: w.font, color: MUTED });
+    const num = `Page ${i + 1} of ${total}`;
+    page.drawText(num, { x: PAGE_W - MARGIN - w.font.widthOfTextAtSize(num, 8), y: MARGIN, size: 8, font: w.font, color: MUTED });
+  });
+}
+
+function scannedOn(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toUTCString();
+}
+
+export async function renderReportPdf(input: PdfReportInput): Promise<Uint8Array> {
+  const { scorecard: card, fixList, crawl } = input;
+  const doc = await PDFDocument.create();
+  const when = new Date(card.fetchedAt);
+  const stamp = Number.isNaN(when.getTime()) ? new Date(0) : when;
+  doc.setTitle(pdfSafe(`${BRAND.tagline}: ${input.finalUrl}`));
+  doc.setAuthor(BRAND.company);
+  doc.setSubject("Crawlspace agent-readiness scorecard and fix list");
+  doc.setCreator(pdfSafe(BRAND.wordmark));
+  doc.setProducer("Crawlspace (pdf-lib)");
+  doc.setCreationDate(stamp);
+  doc.setModificationDate(stamp);
+
+  const w = new Writer(doc, await doc.embedFont(StandardFonts.Helvetica), await doc.embedFont(StandardFonts.HelveticaBold));
+
+  // Title block
+  w.text(BRAND.tagline, { size: 20, bold: true, gap: 4 });
+  w.text(input.finalUrl, { size: 12, bold: true, color: ACCENT, gap: 4 });
+  w.text(`Scanned ${scannedOn(card.fetchedAt)} · site type ${card.siteType} (${card.siteTypeSource}) · rubric v${card.rubricVersion}`, { size: 9, color: MUTED, gap: 10 });
+
+  // Overall
+  w.ensure(60);
+  w.text("Overall score", { size: 10, color: MUTED, gap: 0 });
+  const overallTone = TONES[gradeTone(letterFor(card.overall))];
+  w.text(formatOutOf100(card.overall), { size: 30, bold: true, color: overallTone, gap: 10 });
+
+  // Categories
+  w.text("Category grades", { size: 10, color: MUTED, gap: 4 });
+  for (const k of Object.keys(CATEGORIES) as Category[]) {
+    const score = card.categories[k];
+    const letter = letterFor(score);
+    w.ensure(18);
+    w.y -= 15;
+    w.page.drawText(letter, { x: MARGIN, y: w.y, size: 12, font: w.bold, color: TONES[gradeTone(letter)] });
+    w.page.drawText(pdfSafe(CATEGORIES[k]), { x: MARGIN + 36, y: w.y, size: 11, font: w.font, color: INK });
+    const s = score === null ? "no applicable checks" : `${formatScore(score)}/100`;
+    w.page.drawText(s, { x: MARGIN + 220, y: w.y, size: 11, font: w.font, color: MUTED });
+  }
+  w.y -= 6;
+  w.text("Grades: A 90+, B 80+, C 70+, D 60+, F below 60. Checks that do not apply to this site are left out of the score.", { size: 8, color: MUTED });
+
+  // Fix list
+  w.heading("Fix list");
+  if (fixList.items.length === 0) {
+    w.text("Nothing to fix: every applicable check passed.");
+  } else {
+    const source =
+      fixList.source === "llm" ? "Written by AI, checked against the scan evidence." : fixList.source === "mixed" ? "AI-written where it passed validation, standard fixes for the rest." : "Standard fixes for each failed or partial check.";
+    w.text(source, { size: 9, color: MUTED, gap: 6 });
+    fixList.items.forEach((f, i) => {
+      w.ensure(50);
+      w.text(`${i + 1}. ${f.title}  [${f.checkId}]`, { size: 11, bold: true, gap: 2 });
+      w.text(f.why, { indent: 14 });
+      w.text(`Fix: ${f.how}`, { indent: 14 });
+      if (f.evidenceUrls.length) w.text(`Evidence: ${f.evidenceUrls.join(", ")}`, { indent: 14, size: 8, color: MUTED });
+      w.y -= 6;
+    });
+  }
+
+  // Every check
+  w.heading("All checks");
+  for (const c of card.checks) {
+    w.ensure(36);
+    w.rule();
+    const head = `${c.id}  ${c.title}${c.label ? ` (${c.label})` : ""}`;
+    const status = STATUS_TEXT[c.status];
+    const statusW = w.bold.widthOfTextAtSize(status, 10);
+    const lines = wrapText(head, w.bold, 10, CONTENT_W - 110);
+    lines.forEach((line, i) => {
+      w.ensure(14);
+      w.y -= 13.5;
+      w.page.drawText(line, { x: MARGIN, y: w.y, size: 10, font: w.bold, color: INK });
+      if (i === 0) {
+        w.page.drawText(status, { x: PAGE_W - MARGIN - statusW, y: w.y, size: 10, font: w.bold, color: TONES[STATUS_TONE[c.status]] });
+        const wt = `weight ${c.weight}`;
+        w.page.drawText(wt, { x: PAGE_W - MARGIN - statusW - 12 - w.font.widthOfTextAtSize(wt, 8), y: w.y, size: 8, font: w.font, color: MUTED });
+      }
+    });
+    w.y -= 2;
+    for (const e of c.evidence) {
+      const where = [e.url, e.selector, e.line ? `line ${e.line}` : ""].filter(Boolean).join(" ");
+      w.text(`- ${e.detail}${where ? ` (${where})` : ""}`, { indent: 10, size: 8.5, color: MUTED, gap: 0 });
+    }
+  }
+
+  // Crawl
+  w.heading("How this site was read");
+  w.text(
+    `${crawl.pageRequests} page requests and ${crawl.assetRequests} script requests, all GET, at most one per second, as CrawlspaceBot; ${crawl.blockedBrowserRequests} other browser requests blocked. Not-applicable checks do not count toward the score.`,
+    { size: 9 },
+  );
+  for (const s of crawl.skipped) w.text(`skipped ${s.url}: ${s.reason}`, { size: 8.5, color: MUTED, indent: 10, gap: 0 });
+  for (const n of crawl.notes) w.text(n, { size: 8.5, color: MUTED, indent: 10, gap: 0 });
+  w.y -= 8;
+  w.text(
+    "This is an automated check of up to 15 pages at the time shown. Checks marked heuristic or proposed convention are approximations; read the evidence before acting.",
+    { size: 8, color: MUTED },
+  );
+
+  drawFrame(w, input);
+  return doc.save({ useObjectStreams: false });
+}
+
+/** `crawlspace-shop.example-2026-11-18.pdf` */
+export function pdfFileName(finalUrl: string, fetchedAt: string): string {
+  let host = "report";
+  try {
+    host = new URL(finalUrl).hostname.replace(/[^a-z0-9.-]/gi, "") || host;
+  } catch {
+    // keep the default
+  }
+  const day = /^\d{4}-\d{2}-\d{2}/.exec(fetchedAt)?.[0] ?? "undated";
+  return `crawlspace-${host}-${day}.pdf`;
+}

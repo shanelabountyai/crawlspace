@@ -47,9 +47,15 @@ export function summariseCrawl(report: CrawlReport): CrawlSummary {
   };
 }
 
-/** URL-safe, unguessable scan id (reports are private by link). */
+/**
+ * URL-safe, unguessable scan id (reports are private by link). Never starts with "-", so the CSV formula guard
+ * leaves it alone and exported ids match stored ones exactly (D-46). Existing ids still match `SCAN_ID_RE`.
+ */
 export function newScanId(): string {
-  return randomBytes(12).toString("base64url");
+  for (;;) {
+    const id = randomBytes(12).toString("base64url");
+    if (id[0] !== "-") return id;
+  }
 }
 
 export const SCAN_ID_RE = /^[A-Za-z0-9_-]{16}$/;
@@ -122,4 +128,88 @@ export class ScanStore {
         : null,
     };
   }
+}
+
+export const HUBSPOT_STATUSES = ["off", "sent", "failed"] as const;
+export type HubSpotStatus = (typeof HUBSPOT_STATUSES)[number];
+
+export interface LeadView {
+  id: string;
+  scanId: string;
+  scanUrl: string;
+  email: string;
+  createdAt: string;
+  hubspotStatus: HubSpotStatus;
+  hubspotError: string | null;
+}
+
+/** A scan row for the operator page (no scorecard JSON parsed). */
+export interface ScanListItem {
+  id: string;
+  url: string;
+  status: ScanStatus;
+  createdAt: string;
+  finishedAt: string | null;
+  overall: number | null;
+  categories: Record<string, number | null> | null;
+  leadCount: number;
+}
+
+/** Leads left at the PDF gate (D-36). */
+export class LeadStore {
+  constructor(private readonly db: Db, private readonly now: () => Date = () => new Date()) {}
+
+  async create(scanId: string, email: string): Promise<LeadView> {
+    const row = await this.db.lead.create({
+      data: { id: newScanId(), scanId, email, createdAt: this.now(), hubspotStatus: "off" },
+      include: { scan: { select: { url: true } } },
+    });
+    return toLead(row);
+  }
+
+  async setHubSpot(id: string, status: HubSpotStatus, error: string | null = null): Promise<void> {
+    await this.db.lead.update({ where: { id }, data: { hubspotStatus: status, hubspotError: error?.slice(0, 500) ?? null } });
+  }
+
+  async countSince(scanId: string, since: Date): Promise<number> {
+    return this.db.lead.count({ where: { scanId, createdAt: { gte: since } } });
+  }
+
+  async list(limit = 500): Promise<LeadView[]> {
+    const rows = await this.db.lead.findMany({ orderBy: { createdAt: "desc" }, take: limit, include: { scan: { select: { url: true } } } });
+    return rows.map(toLead);
+  }
+}
+
+function toLead(r: { id: string; scanId: string; email: string; createdAt: Date; hubspotStatus: string; hubspotError: string | null; scan: { url: string } }): LeadView {
+  return { id: r.id, scanId: r.scanId, scanUrl: r.scan.url, email: r.email, createdAt: r.createdAt.toISOString(), hubspotStatus: r.hubspotStatus as HubSpotStatus, hubspotError: r.hubspotError };
+}
+
+/** Newest scans first with their score and lead count, for the operator page (D-40). */
+export async function listScans(db: Db, limit = 200): Promise<ScanListItem[]> {
+  const rows = await db.scan.findMany({
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: { report: { select: { overall: true, scorecard: true } }, _count: { select: { leads: true } } },
+  });
+  return rows.map((s) => {
+    let categories: Record<string, number | null> | null = null;
+    if (s.report) {
+      try {
+        categories = (JSON.parse(s.report.scorecard) as Scorecard).categories;
+      } catch {
+        categories = null;
+      }
+    }
+    return {
+      id: s.id,
+      url: s.url,
+      status: s.status as ScanStatus,
+      createdAt: s.createdAt.toISOString(),
+      finishedAt: s.finishedAt ? s.finishedAt.toISOString() : null,
+      overall: s.report?.overall ?? null,
+      categories,
+      leadCount: s._count.leads,
+    };
+  });
 }
