@@ -20,6 +20,7 @@ model Scan {
   startedAt  DateTime?
   finishedAt DateTime?
   report     Report?
+  leads      Lead[]
 
   @@index([createdAt])
 }
@@ -38,4 +39,18 @@ model Report {
   fixList       String
   /// Crawl summary: request counts, skipped URLs, notes (no page HTML, D-29)
   crawl         String
+}
+
+/// An email left at the PDF gate (D-35, D-36). hubspotStatus: off | sent | failed
+model Lead {
+  id            String   @id
+  scanId        String
+  scan          Scan     @relation(fields: [scanId], references: [id], onDelete: Cascade)
+  email         String
+  createdAt     DateTime
+  hubspotStatus String
+  hubspotError  String?
+
+  @@index([scanId])
+  @@index([createdAt])
 }

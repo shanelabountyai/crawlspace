@@ -3,7 +3,9 @@ import { generateFixList, type FixListModel } from "@/lib/fixlist";
 import { modelFromEnv } from "./anthropic-model";
 import { injectedDeps } from "./crawl-options";
 import { getDb } from "./db";
-import { ScanStore, summariseCrawl } from "./store";
+import { hubspotFromEnv } from "./hubspot";
+import { LeadService } from "./lead-service";
+import { LeadStore, ScanStore, summariseCrawl } from "./store";
 
 /** Scans waiting or running at once (D-29). */
 export const QUEUE_LIMIT = 5;
@@ -89,4 +91,17 @@ export function getScanService(): Promise<ScanService> {
     return new ScanService(store, resolveDeps());
   })();
   return g[KEY];
+}
+
+const LEADS_KEY = Symbol.for("crawlspace.leadService");
+type LeadHolder = { [LEADS_KEY]?: Promise<LeadService> };
+
+/** Production wiring for the PDF gate: same DB as the scans; HubSpot only if the flag is on (D-36). */
+export function getLeadService(): Promise<LeadService> {
+  const g = globalThis as LeadHolder;
+  g[LEADS_KEY] ??= (async () => {
+    const svc = await getScanService();
+    return new LeadService(svc.store, new LeadStore(getDb()), hubspotFromEnv());
+  })();
+  return g[LEADS_KEY];
 }
