@@ -1,5 +1,13 @@
 # Crawlspace — next
 
+## Report title fix (2026-11-19, branch `fix/report-title-race`)
+
+PR #7 (deploy files) was merged by Claude on the owner's instruction on 2026-11-19; nothing is deployed. CI on the merge
+commit (1536017) was red on `check`: the a11y e2e noted as a flake in D-74 failed again. Diagnosed and fixed (D-75):
+with Next's streaming metadata, the report appeared for about 300 ms with no page title when progress refreshed into
+the report. `next.config.ts` now turns streaming metadata off; the old test is unchanged and a new e2e watches for a
+title-less moment. Left alone: a 2 to 5 ms moment without a title when the form navigates to the progress page.
+
 ## Deploy files for Render (scheduled run, 2026-11-19, branch `deploy/render`)
 
 The owner chose Render on 2026-11-18 (D-08 settled, D-65). This run added the deploy files as one draft PR
