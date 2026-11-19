@@ -2,7 +2,9 @@
 
 Agent-readiness scanner: point it at a site, get a scorecard of how well AI agents can read and act on it, plus a ranked fix list.
 
-Build-log #25. Status: **Phase 4 (lead capture, operator page, PDF export, deploy notes)** on top of Phases 1–3 (engine, crawler, web UI), plus the **design pass** (Claude Design look from `docs/design/`, gap screens, design/UX/accessibility review; PRD §9). **Not deployed.** Host chosen: Render (D-65); the `Dockerfile` and `render.yaml` are in the repo and CI builds and smoke-tests the image, but nothing has been created on Render (owner steps in `docs/DEPLOY.md`). Spec in `docs/PRD.md`, plans in `docs/PHASE1_PLAN.md` … `docs/PHASE4_PLAN.md`, decisions in `docs/DECISIONS.md`, hand-off in `NEXT.md`.
+**Live: https://crawlspace.onrender.com**
+
+Build-log #25. Status: **Phase 4 (lead capture, operator page, PDF export, deploy notes)** on top of Phases 1–3 (engine, crawler, web UI), plus the **design pass** (Claude Design look from `docs/design/`, gap screens, design/UX/accessibility review; PRD §9). **Deployed on Render** at https://crawlspace.onrender.com by the owner on 2026-11-19 (D-65), from the `Dockerfile` and `render.yaml` in the repo; the operator page is off there (D-72). Steps and caveats in `docs/DEPLOY.md`. Spec in `docs/PRD.md`, plans in `docs/PHASE1_PLAN.md` … `docs/PHASE4_PLAN.md`, decisions in `docs/DECISIONS.md`, hand-off in `NEXT.md`.
 
 ```bash
 npm install                            # also runs `prisma generate`
@@ -44,7 +46,7 @@ The report page shows the overall score over 100 and an A–F grade per category
 
 ## Deploy
 
-Not deployed. The owner chose Render on 2026-11-18 (D-08, D-65). The repo holds the deploy files and nothing else has been done:
+Deployed on Render at https://crawlspace.onrender.com (owner, 2026-11-19; host chosen 2026-11-18, D-08, D-65). Checked from outside on 2026-11-19: `/api/health` answers `{"status":"ok"}`, the home page loads, and `/operator` says it is turned off. Not checked from outside: a full scan, the PDF gate, and the report surviving a restart (`docs/DEPLOY.md` step 7). The deploy files:
 
 - `Dockerfile` + `scripts/docker-entrypoint.sh`: Node 22, Chromium for Playwright, one process, the app runs as a non-root user and listens on `PORT` (7900 when unset).
 - `render.yaml`: one Docker web service, one instance, a disk at `/data` for SQLite, health check `GET /api/health`, auto-deploy off, secret keys without values.

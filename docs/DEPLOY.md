@@ -1,6 +1,6 @@
 # Crawlspace — deploy notes
 
-Status: **not deployed**. The host is decided: **Render**, chosen by the owner on 2026-11-18 (D-08, D-65). The deploy
+Status: **deployed on Render** at https://crawlspace.onrender.com by the owner on 2026-11-19 (host chosen 2026-11-18, D-08, D-65); the text below was written before that deploy and is kept as the record of how it was prepared. The deploy
 files exist (`Dockerfile`, `.dockerignore`, `scripts/docker-entrypoint.sh`, `render.yaml`) and CI builds and
 smoke-tests the image, but nothing here has been run against a hosting provider; no account, domain, environment
 variable or secret was created. Prices and plan limits are not listed because they change: check them on the day.
