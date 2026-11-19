@@ -8,9 +8,11 @@ import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
  * password guesses offline. Nothing is stored per session; a restart signs the operator out, and so does changing
  * the password. Unset or short password → the operator page is disabled.
  *
- * Sign-in limit: attempts are counted per client address, in one synchronous step before the request body is read
- * (D-76, D-77). The address comes from X-Forwarded-For only when CRAWLSPACE_TRUSTED_PROXY_HOPS says how many proxies
- * in front of the app write to it; otherwise every request shares one bucket (D-78).
+ * Sign-in limit (D-76, D-77): wrong passwords are counted per client address. The check "is this address full?", the
+ * password comparison and the count happen in one synchronous step after the body has been read, so requests that
+ * arrive together cannot all slip under the limit, and a request that never sends a password takes nothing. The
+ * address comes from X-Forwarded-For only when CRAWLSPACE_TRUSTED_PROXY_HOPS says how many proxies in front of the
+ * app write to it; otherwise every request shares one bucket (D-78).
  */
 export const OPERATOR_COOKIE = "cs_op";
 export const MIN_PASSWORD_LENGTH = 12;
@@ -18,12 +20,16 @@ export const SESSION_MS = 12 * 3_600_000;
 export const LOGIN_WINDOW_MS = 15 * 60_000;
 /** Wrong passwords one client address may have counted against it inside the window. */
 export const LOGIN_MAX_FAILURES = 10;
-/** Counted attempts from all addresses together inside the window before sign-in slows down (it never stops). */
+/** Wrong passwords from all addresses together inside the window before sign-in slows down. */
 export const LOGIN_GLOBAL_FREE = 50;
 /** While slowed, passwords are checked one at a time, this far apart. */
 export const LOGIN_SLOW_GAP_MS = 1_000;
-/** Addresses remembered at once; beyond it, new addresses share one bucket until old ones expire. */
-export const LOGIN_MAX_CLIENTS = 5_000;
+/** While slowed, at most this many requests wait for their turn. */
+export const LOGIN_MAX_WAITING = 30;
+/** While slowed, a request that has waited this long is told to try again instead of being kept open. */
+export const LOGIN_MAX_WAIT_MS = 30_000;
+/** A sign-in request body larger than this is refused unread. */
+export const LOGIN_MAX_BODY_BYTES = 8_192;
 /** The bucket for requests whose address is unknown or not trusted. */
 export const SHARED_CLIENT = "shared";
 export const TRUSTED_PROXY_HOPS_ENV = "CRAWLSPACE_TRUSTED_PROXY_HOPS";
@@ -44,6 +50,11 @@ function processKey(): Buffer {
   const g = globalThis as { [KEY_SYMBOL]?: Buffer };
   g[KEY_SYMBOL] ??= randomBytes(32);
   return g[KEY_SYMBOL];
+}
+
+/** Sign-out: a new key, so every cookie issued so far stops working, copies included (D-79). There is one operator. */
+export function endAllSessions(): void {
+  (globalThis as { [KEY_SYMBOL]?: Buffer })[KEY_SYMBOL] = randomBytes(32);
 }
 
 const keyed = (label: string, msg: string) => createHmac("sha256", processKey()).update(`crawlspace-operator-v2:${label}:${msg}`).digest();
@@ -84,7 +95,13 @@ export function cookieValue(header: string | null, name: string): string | null 
   if (!header) return null;
   for (const part of header.split(";")) {
     const i = part.indexOf("=");
-    if (i > 0 && part.slice(0, i).trim() === name) return decodeURIComponent(part.slice(i + 1).trim());
+    if (i > 0 && part.slice(0, i).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(i + 1).trim());
+      } catch {
+        return null; // a value that is not valid percent-encoding is no session
+      }
+    }
   }
   return null;
 }
@@ -187,7 +204,17 @@ export function clientKey(req: Request, hops: number = trustedProxyHops()): stri
   return addressKey(entries[entries.length - hops]!) ?? SHARED_CLIENT;
 }
 
-/** Sliding window of counted attempts for one bucket, in process (D-39). */
+/**
+ * The wider network an address sits in: IPv4 /24, IPv6 /48. Used only to decide who goes first while sign-in is
+ * slowed (D-77), never to refuse anyone: one holder of a large block cannot pose as many unrelated newcomers.
+ */
+export function networkOf(client: string): string {
+  if (client === SHARED_CLIENT) return SHARED_CLIENT;
+  if (client.endsWith("::/64")) return `${client.split(":").slice(0, 3).join(":")}::/48`;
+  return `${client.split(".").slice(0, 3).join(".")}.0/24`;
+}
+
+/** Failed-login window for one bucket, in process (D-39). Kept as the simple building block it was; `LoginGate` is what the route uses. */
 export class LoginLimiter {
   private failures: number[] = [];
   constructor(
@@ -203,71 +230,61 @@ export class LoginLimiter {
   fail(now: number = Date.now()) {
     this.failures.push(now);
   }
-
-  /** Check and count in one step with nothing awaited in between: false when the bucket is full (D-76). */
-  reserve(now: number = Date.now()): boolean {
-    if (this.blocked(now)) return false;
-    this.failures.push(now);
-    return true;
-  }
-
-  /** Take back one attempt counted at `at` (the password was right, or it was never checked). */
-  refund(at: number) {
-    const i = this.failures.lastIndexOf(at);
-    if (i >= 0) this.failures.splice(i, 1);
-  }
-
-  /** Attempts counted in the window right now. */
-  count(now: number = Date.now()): number {
-    this.failures = this.failures.filter((t) => t > now - this.windowMs);
-    return this.failures.length;
-  }
-
-  idle(now: number = Date.now()): boolean {
-    return this.count(now) === 0;
-  }
 }
 
-export type LoginTicket =
-  | { ok: false; reason: "locked" }
-  | {
-      ok: true;
-      /** The bucket this attempt was counted in. */
-      client: string;
-      /** Resolves when the password may be checked: at once normally, after a wait while sign-in is slowed. Never refuses. */
-      turn(): Promise<void>;
-      /** Give the counted attempt back: the password was right, or the request ended before it was checked. */
-      release(): void;
-    };
+/** Permission to check one password, from `LoginGate.turn`. Used once. */
+export interface LoginPass {
+  readonly client: string;
+}
 
 export interface LoginGateOptions {
   max?: number;
   windowMs?: number;
   globalFree?: number;
   slowGapMs?: number;
-  maxClients?: number;
+  maxWaiting?: number;
+  maxWaitMs?: number;
+  /** A clock that never goes backwards (milliseconds). */
   now?: () => number;
   sleep?: (ms: number) => Promise<void>;
 }
 
+type Waiter = { client: string; network: string; since: number; go: (granted: boolean) => void };
+type Pass = LoginPass & { free: boolean; used: boolean };
+
 /**
- * Sign-in limit (D-76, D-77), in process. `enter` counts the attempt against its client's bucket before anything is
- * awaited, so requests that arrive together cannot all slip under the limit; a full bucket refuses only that client.
- * Past `globalFree` counted attempts from all clients together, `turn` lines checks up one at a time, `slowGapMs`
- * apart, the client with the fewest counted attempts first: a slowdown for everyone, never a refusal. A client that
- * has not guessed before is therefore checked ahead of every client that has.
+ * Sign-in limit, in process (D-76, D-77).
+ *
+ * - `attempt` is synchronous: "is this client full?", the password comparison and the count are one step, so
+ *   requests that arrive together are settled one after another and no more than `max` wrong passwords per client are
+ *   ever compared inside the window. A full client is refused without its password being looked at; other clients
+ *   are not affected.
+ * - `turn` hands out the permission to make that step. The first `globalFree` wrong passwords in the window (from
+ *   all clients together) cost no wait. Past that, permissions are handed out one at a time, `slowGapMs` apart, to
+ *   the waiting request whose network has the fewest wrong passwords counted (ties: first come). That bounds the
+ *   total guessing rate whatever the number of addresses, and puts a newcomer ahead of everyone who has guessed.
+ *   "Fewest" counts the network (IPv4 /24, IPv6 /48) and the requests from it already waiting, so one address or one
+ *   block cannot fill the line. Only when more than `maxWaiting` requests wait, or one has waited `maxWaitMs`, is a
+ *   waiting request told to come back (the one with the most behind it first); nothing is counted against it.
+ *
+ * Memory: one small record per counted wrong password in the window, and those are bounded by the two limits above;
+ * at most `maxWaiting` waiting requests.
  */
 export class LoginGate {
   private readonly max: number;
   private readonly windowMs: number;
   private readonly globalFree: number;
   private readonly slowGapMs: number;
-  private readonly maxClients: number;
+  private readonly maxWaiting: number;
+  private readonly maxWaitMs: number;
   private readonly now: () => number;
   private readonly sleep: (ms: number) => Promise<void>;
-  private readonly clients = new Map<string, LoginLimiter>();
-  private counted: number[] = [];
-  private readonly queue: { limiter: LoginLimiter; go: () => void }[] = [];
+  private wrong: { at: number; client: string; network: string }[] = [];
+  /** Free permissions handed out and not yet used (with the time they were given). */
+  private freeOut: number[] = [];
+  /** Turns handed out while slowed and not yet used: they count towards their network's place in the line. */
+  private slowOut: { at: number; network: string }[] = [];
+  private readonly queue: Waiter[] = [];
   private pumping = false;
   private lastSlowAt = Number.NEGATIVE_INFINITY;
 
@@ -276,22 +293,65 @@ export class LoginGate {
     this.windowMs = o.windowMs ?? LOGIN_WINDOW_MS;
     this.globalFree = o.globalFree ?? LOGIN_GLOBAL_FREE;
     this.slowGapMs = o.slowGapMs ?? LOGIN_SLOW_GAP_MS;
-    this.maxClients = o.maxClients ?? LOGIN_MAX_CLIENTS;
-    this.now = o.now ?? Date.now;
+    this.maxWaiting = o.maxWaiting ?? LOGIN_MAX_WAITING;
+    this.maxWaitMs = o.maxWaitMs ?? LOGIN_MAX_WAIT_MS;
+    this.now = o.now ?? (() => performance.now());
     this.sleep = o.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
   }
 
-  /** Buckets currently remembered (for tests and the memory bound). */
-  get size(): number {
-    return this.clients.size;
+  private prune(now: number) {
+    if (this.wrong.length > 0 && this.wrong[0]!.at <= now - this.windowMs) this.wrong = this.wrong.filter((w) => w.at > now - this.windowMs);
+    // A free permission that was never used (the request died) stops counting after the longest a request may wait.
+    if (this.freeOut.length > 0 && this.freeOut[0]! <= now - this.maxWaitMs) this.freeOut = this.freeOut.filter((t) => t > now - this.maxWaitMs);
+    if (this.slowOut.length > 0 && this.slowOut[0]!.at <= now - this.maxWaitMs) this.slowOut = this.slowOut.filter((o) => o.at > now - this.maxWaitMs);
   }
 
-  /** Attempts waiting for their turn while sign-in is slowed. */
+  /** Wrong passwords counted in the window: for one client, or for all. */
+  count(client?: string): number {
+    this.prune(this.now());
+    return client === undefined ? this.wrong.length : this.wrong.filter((w) => w.client === client).length;
+  }
+
+  /** Requests waiting for their turn while sign-in is slowed. */
   get waiting(): number {
     return this.queue.length;
   }
 
-  /** Lets waiting attempts through one at a time, `slowGapMs` apart, fewest counted attempts first (ties: first come). */
+  /** True when this client has used up its wrong passwords for the window. Counts nothing. */
+  blocked(client: string): boolean {
+    return this.count(client) >= this.max;
+  }
+
+  /** Wrong passwords counted for the waiter's network, plus its turns being used right now, plus its requests waiting ahead. */
+  private rank(i: number): number {
+    const network = this.queue[i]!.network;
+    let n = 0;
+    for (const w of this.wrong) if (w.network === network) n++;
+    for (const o of this.slowOut) if (o.network === network) n++;
+    for (let j = 0; j < i; j++) if (this.queue[j]!.network === network) n++;
+    return n;
+  }
+
+  /** Send away, uncounted, every waiting request for which `gone` is true. */
+  private dismiss(gone: (w: Waiter) => boolean) {
+    for (let i = this.queue.length - 1; i >= 0; i--) if (gone(this.queue[i]!)) this.queue.splice(i, 1)[0]!.go(false);
+  }
+
+  /** Index of the waiting request to serve next (`best`) or to send away first (`!best`). */
+  private pick(best: boolean): number {
+    let at = 0;
+    let rank = this.rank(0);
+    for (let i = 1; i < this.queue.length; i++) {
+      const r = this.rank(i);
+      // Serve: lowest rank, earliest arrival. Send away: highest rank, latest arrival.
+      if (best ? r < rank : r >= rank) {
+        at = i;
+        rank = r;
+      }
+    }
+    return at;
+  }
+
   private async pump(): Promise<void> {
     if (this.pumping) return;
     this.pumping = true;
@@ -300,64 +360,57 @@ export class LoginGate {
         const wait = this.lastSlowAt + this.slowGapMs - this.now();
         if (wait > 0) await this.sleep(wait);
         const now = this.now();
-        let best = 0;
-        for (let i = 1; i < this.queue.length; i++) if (this.queue[i]!.limiter.count(now) < this.queue[best]!.limiter.count(now)) best = i;
-        const [next] = this.queue.splice(best, 1);
+        this.prune(now);
+        // No turn is spent on a request that has waited too long or whose address has filled up in the meantime.
+        this.dismiss((w) => now - w.since >= this.maxWaitMs || this.blocked(w.client));
+        if (this.queue.length === 0) break;
+        const [next] = this.queue.splice(this.pick(true), 1);
         this.lastSlowAt = now;
-        next!.go();
+        this.slowOut.push({ at: now, network: next!.network });
+        next!.go(true);
       }
     } finally {
       this.pumping = false;
     }
   }
 
-  private bucket(client: string, now: number): { name: string; limiter: LoginLimiter } {
-    let name = client;
-    let limiter = this.clients.get(name);
-    if (!limiter && name !== SHARED_CLIENT && this.clients.size >= this.maxClients) {
-      for (const [k, l] of this.clients) if (l.idle(now)) this.clients.delete(k);
-      if (this.clients.size >= this.maxClients) {
-        // Still full of addresses with live counts: an unknown newcomer is counted with the shared bucket.
-        name = SHARED_CLIENT;
-        limiter = this.clients.get(name);
-      }
+  /**
+   * Resolves with a pass when this request may have its password checked, or null when sign-in is slowed and the
+   * request should come back later (see the class comment). Call it after the body has been read.
+   */
+  async turn(client: string): Promise<LoginPass | null> {
+    const now = this.now();
+    this.prune(now);
+    if (this.wrong.length + this.freeOut.length < this.globalFree) {
+      this.freeOut.push(now);
+      return { client, free: true, used: false } as Pass;
     }
-    if (!limiter) {
-      limiter = new LoginLimiter(this.max, this.windowMs);
-      this.clients.set(name, limiter);
-    }
-    return { name, limiter };
+    const granted = await new Promise<boolean>((go) => {
+      this.queue.push({ client, network: networkOf(client), since: now, go });
+      if (this.queue.length > this.maxWaiting) this.queue.splice(this.pick(false), 1)[0]!.go(false);
+      void this.pump();
+    });
+    return granted ? ({ client, free: false, used: false } as Pass) : null;
   }
 
-  /** Synchronous on purpose: call it before the first `await` of the request. */
-  enter(client: string): LoginTicket {
-    const at = this.now();
-    this.counted = this.counted.filter((t) => t > at - this.windowMs);
-    const { name, limiter } = this.bucket(client, at);
-    if (!limiter.reserve(at)) return { ok: false, reason: "locked" };
-    this.counted.push(at);
-    let held = true;
-    let turned = false;
-    const release = () => {
-      if (!held) return;
-      held = false;
-      limiter.refund(at);
-      const i = this.counted.lastIndexOf(at);
-      if (i >= 0) this.counted.splice(i, 1);
-      if (this.clients.get(name) === limiter && limiter.idle(this.now())) this.clients.delete(name);
-    };
-    const turn = async (): Promise<void> => {
-      if (!held || turned) return;
-      turned = true;
-      const now = this.now();
-      this.counted = this.counted.filter((t) => t > now - this.windowMs);
-      if (this.counted.length <= this.globalFree) return;
-      await new Promise<void>((go) => {
-        this.queue.push({ limiter, go });
-        void this.pump();
-      });
-    };
-    return { ok: true, client: name, turn, release };
+  /**
+   * One synchronous step: refuse a full client unchecked, otherwise run `check` once and count a wrong answer.
+   * Nothing is awaited between the three, which is what makes the limit hold for requests that arrive together.
+   */
+  attempt(pass: LoginPass, check: () => boolean): "right" | "wrong" | "locked" {
+    const p = pass as Pass;
+    if (p.used) return "locked";
+    p.used = true;
+    if (p.free) this.freeOut.shift();
+    else {
+      const network = networkOf(p.client);
+      const i = this.slowOut.findIndex((o) => o.network === network);
+      if (i >= 0) this.slowOut.splice(i, 1);
+    }
+    if (this.blocked(p.client)) return "locked";
+    if (check()) return "right";
+    this.wrong.push({ at: this.now(), client: p.client, network: networkOf(p.client) });
+    return "wrong";
   }
 }
 
@@ -366,6 +419,40 @@ export function loginGate(): LoginGate {
   const g = globalThis as { [LIMITER_KEY]?: LoginGate };
   g[LIMITER_KEY] ??= new LoginGate();
   return g[LIMITER_KEY];
+}
+
+/**
+ * Read at most `max` bytes of a request body. Null when it is longer (by its Content-Length, or by what arrives) or
+ * cannot be read: nothing larger than a password form is ever buffered or hashed.
+ */
+export async function readSmallBody(req: Request, max: number = LOGIN_MAX_BODY_BYTES): Promise<Uint8Array<ArrayBuffer> | null> {
+  const declared = req.headers.get("content-length");
+  if (declared !== null && (!/^\d{1,15}$/.test(declared) || Number(declared) > max)) return null;
+  if (!req.body) return new Uint8Array(new ArrayBuffer(0));
+  const reader = req.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let size = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      size += value.byteLength;
+      if (size > max) {
+        await reader.cancel().catch(() => undefined);
+        return null;
+      }
+      chunks.push(value);
+    }
+  } catch {
+    return null;
+  }
+  const out = new Uint8Array(new ArrayBuffer(size));
+  let at = 0;
+  for (const c of chunks) {
+    out.set(c, at);
+    at += c.byteLength;
+  }
+  return out;
 }
 
 /** For route handlers: 404 when disabled, 401 without a valid session, 403 cross-origin POST, else null (go on). */

@@ -18,6 +18,7 @@ const CATS = Object.keys(CATEGORIES) as Category[];
 const ERRORS: Record<string, { lead: string; detail: string }> = {
   wrong: { lead: "Wrong password.", detail: "Try again." },
   locked: { lead: "Too many wrong passwords.", detail: "Wait 15 minutes and try again." },
+  busy: { lead: "Sign-in is busy.", detail: "Try again in a minute." },
 };
 const SCAN_STATUS = {
   queued: { word: "Waiting", glyph: "○", tone: "na" },

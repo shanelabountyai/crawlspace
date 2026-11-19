@@ -1,4 +1,4 @@
-import { checkPassword, clientKey, isSecure, issueToken, loginGate, operatorConfig, sameOrigin, sessionCookie } from "@/server/operator-auth";
+import { checkPassword, clientKey, isSecure, issueToken, loginGate, operatorConfig, readSmallBody, sameOrigin, sessionCookie } from "@/server/operator-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,27 +10,35 @@ export async function POST(req: Request): Promise<Response> {
   const cfg = operatorConfig();
   if (!cfg.enabled) return Response.json({ error: "not found" }, { status: 404 });
   if (!sameOrigin(req)) return Response.json({ error: "cross-origin request refused" }, { status: 403 });
-  const isJson = (req.headers.get("content-type") ?? "").includes("application/json");
+  const contentType = req.headers.get("content-type") ?? "";
+  const isJson = contentType.includes("application/json");
+  const locked = () => (isJson ? Response.json({ error: "too many attempts; wait 15 minutes" }, { status: 429 }) : new Response(null, back("?error=locked")));
+  const unreadable = () => Response.json({ error: "could not read the request" }, { status: 400 });
 
-  // Count this attempt against its client before anything is awaited (D-76): requests that arrive together each
-  // take a place or are refused here, without their password being looked at.
-  const ticket = loginGate().enter(clientKey(req));
-  if (!ticket.ok) return isJson ? Response.json({ error: "too many attempts; wait 15 minutes" }, { status: 429 }) : new Response(null, back("?error=locked"));
+  const gate = loginGate();
+  const client = clientKey(req);
+  // An address that has used up its wrong passwords is refused before its body is read. This is a shortcut only:
+  // the check that counts is inside `gate.attempt` below.
+  if (gate.blocked(client)) return locked();
 
+  const bytes = await readSmallBody(req);
+  if (!bytes) return unreadable();
   let password: unknown;
   try {
-    password = isJson ? ((await req.json()) as { password?: unknown } | null)?.password : (await req.formData()).get("password");
+    const body = new Response(bytes, { headers: { "content-type": contentType } });
+    password = isJson ? ((await body.json()) as { password?: unknown } | null)?.password : (await body.formData()).get("password");
   } catch {
-    ticket.release(); // nothing was checked
-    return Response.json({ error: "could not read the request" }, { status: 400 });
+    return unreadable();
   }
-  // Under a flood from many addresses this waits its turn (D-77); it resolves at once otherwise and never refuses.
-  await ticket.turn();
-  if (!checkPassword(cfg, password)) {
-    // The place taken above stays counted as this client's wrong password.
-    return isJson ? Response.json({ error: "wrong password" }, { status: 401 }) : new Response(null, back("?error=wrong"));
-  }
-  ticket.release();
+
+  // At once normally; under a flood of wrong passwords from many addresses this waits for its turn (D-77).
+  const pass = await gate.turn(client);
+  if (!pass) return isJson ? Response.json({ error: "sign-in is busy; try again in a minute" }, { status: 429 }) : new Response(null, back("?error=busy"));
+  // One synchronous step (D-76): refuse a full address unchecked, else compare, and count a wrong password.
+  const outcome = gate.attempt(pass, () => checkPassword(cfg, password));
+  if (outcome === "locked") return locked();
+  if (outcome === "wrong") return isJson ? Response.json({ error: "wrong password" }, { status: 401 }) : new Response(null, back("?error=wrong"));
+
   const cookie = sessionCookie(issueToken(cfg), isSecure(req));
   if (isJson) return Response.json({ ok: true }, { headers: { "set-cookie": cookie } });
   const init = back();
