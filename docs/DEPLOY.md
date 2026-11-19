@@ -25,7 +25,8 @@ The owner's steps are under [Render](#render-chosen-host-d-65).
 |---|---|---|
 | `DATABASE_FILE` | `./data/crawlspace.db` | point at the persistent volume (`/data/crawlspace.db` in `render.yaml`) |
 | `PORT` | unset → 7900 | read only by the container entrypoint (D-68); Render sets it. `npm start` and `npm run dev` still use 7900 |
-| `CRAWLSPACE_OPERATOR_PASSWORD` | unset → operator page off | at least 12 characters; changing it signs everyone out (D-39) |
+| `CRAWLSPACE_OPERATOR_PASSWORD` | unset → operator page off | at least 12 characters; changing it, restarting or deploying signs everyone out (D-39, D-79) |
+| `CRAWLSPACE_TRUSTED_PROXY_HOPS` | unset → no forwarded address is trusted | not a secret. How many proxies in front of the app write to `X-Forwarded-For`, 1 to 5; anything else counts as unset. Makes the sign-in limit per client address (D-78). Find the number on the running service first: see [Operator sign-in](#operator-sign-in-read-before-step-4) |
 | `ANTHROPIC_API_KEY` | unset → template fix list | optional (D-25) |
 | `CRAWLSPACE_FIXLIST_MODEL` | `claude-sonnet-4-5` | optional (D-31) |
 | `CRAWLSPACE_HUBSPOT_ENABLED` | unset → off | `1` turns on the HubSpot form submission (D-05, D-36) |
@@ -92,7 +93,7 @@ Nothing below has been done. The files were written from Render's public docs, r
 | `Dockerfile` | `node:22-bookworm`, `npm ci`, Chromium and its libraries for the locked Playwright version, `npm run build` (D-66) |
 | `scripts/docker-entrypoint.sh` | starts `next start` on `0.0.0.0:$PORT` (7900 if `PORT` is unset); makes the directory of `DATABASE_FILE` writable and runs the app as the non-root `node` user (D-67, D-68) |
 | `.dockerignore` | keeps `data/`, `.env*`, `node_modules`, `.next`, test output and `docs/` out of the image |
-| `render.yaml` | one Docker web service, one instance, no autoscaling, disk at `/data`, `DATABASE_FILE=/data/crawlspace.db`, health check `/api/health`, auto-deploy off, four secret keys with no values (D-70) |
+| `render.yaml` | one Docker web service, one instance, no autoscaling, disk at `/data`, `DATABASE_FILE=/data/crawlspace.db`, health check `/api/health`, auto-deploy off, four secret keys with no values (D-70) and `CRAWLSPACE_TRUSTED_PROXY_HOPS` with no value (D-80) |
 | `scripts/docker-smoke.sh` + the `docker` job in CI | builds the image, starts it with `PORT=10000` and a mounted `/data`, fails unless `/api/health` and `/` answer 200 (D-71) |
 
 To try the image on a machine with Docker (the agent sandbox could not build it, D-71):
@@ -117,16 +118,64 @@ docker build -t crawlspace:ci . && bash scripts/docker-smoke.sh crawlspace:ci
   disk restore for database recovery (disks). Hence step 9.
 - Render blocks outbound port 25 for all services (free plan limits). Nothing else about outbound limits was found.
 
-### Operator sign-in caveat (read before step 4)
+### Operator sign-in (read before step 4)
 
-The Phase 4 review's operator-login should-fix items are **still open** (`NEXT.md` "Review run", items 1, 2 and 5):
-the login limiter is checked before the request body is read, so concurrent requests can skip the 10-per-15-minutes
-limit; the limiter is one global counter checked before the password, so anyone can keep the operator locked out; and
-the session token is an HMAC keyed directly by the password, so a stolen cookie allows an offline dictionary attack.
-D-44 says to revisit them before any deploy. **Recommendation: leave `CRAWLSPACE_OPERATOR_PASSWORD` unset on Render
-until they are fixed** (D-72). Unset, `/operator` says it is turned off and every operator API answers 404. Scans,
-reports and the PDF gate work without it. (Item 3, text from the link shown on the page, was fixed in the design
-pass: D-61.)
+The three operator-login weaknesses from the Phase 4 review that kept `/operator` off (D-44, D-72) are fixed on the
+branch `fix/operator-login` (D-76 to D-81). **It is safe to set `CRAWLSPACE_OPERATOR_PASSWORD` once that pull request
+is merged and deployed.** Use a long random password (at least 12 characters; the app keeps the page off for anything
+shorter). What holds now, each with a test in `tests/server/operator-login-route.test.ts` or
+`tests/server/operator-login-gate.test.ts`:
+
+- **The limit holds for requests that arrive together** (D-76). No more than 10 wrong passwords per address are
+  compared in 15 minutes; an address that is full is refused without its password being looked at.
+- **A stolen cookie gives no way to test password guesses offline** (D-79). The cookie is signed with a random key
+  that exists only in the running process, not with the password. Consequences you will notice: every restart or
+  deploy signs you out, and so does changing the password. Signing out ends the session everywhere, so a copy of the
+  cookie stops working.
+- **Other people's wrong passwords lock only their own address, once the app knows the address** (D-77, D-78). This
+  part needs one setting, below. Until it is set, sign-in behaves as before in this one respect: all addresses share
+  one limit, so anyone who sends 10 wrong passwords every 15 minutes keeps you locked out. Guessing stays bounded
+  either way, and restarting the service clears the counts.
+- **A flood slows sign-in instead of stopping it** (D-77). After 50 wrong passwords in 15 minutes from all addresses
+  together, passwords are checked one at a time, one second apart. A new address goes ahead of addresses and blocks
+  that have already guessed. At most 30 requests wait, none longer than 30 seconds.
+
+What does **not** hold (residual risk, D-77 to D-79):
+
+1. With `CRAWLSPACE_TRUSTED_PROXY_HOPS` unset, set too low, or with the header missing: lockout by anyone, as above.
+2. With it set **too high**, the attacker chooses which address is counted: they can lock any address they name and
+   are no longer held to 10 per address. That is worse than unset. Only the one-per-second bound still applies.
+3. During a flood, if 30 requests from different networks are already waiting, the next one, yours included, is
+   answered "Sign-in is busy. Try again in a minute." Nothing is counted against it.
+4. Someone on your own address (same office or home connection) shares your 10 attempts; someone flooding from your
+   own block (IPv4 /24, IPv6 /56) is ahead of you in the line.
+5. A cookie copied from your browser works until it expires (12 hours), you sign out, or the service restarts.
+6. Not verified on Render: what `X-Forwarded-For` contains there, and that the app's port cannot be reached around
+   Render's proxy ("Not verified" 11).
+
+#### Finding `CRAWLSPACE_TRUSTED_PROXY_HOPS` on Render (step 8)
+
+Do not guess the number. Render's docs do not state it (D-78).
+
+1. Leave the variable empty. Set the password, deploy, sign in at `https://<your-service>.onrender.com/operator`.
+2. In the same browser open `https://<your-service>.onrender.com/api/operator/client-address`. `forwardedFor` is the
+   list of addresses as the app received it; `countedAs` is `shared` for now.
+3. Look up your own public address (any "what is my IP" page). Find it in `forwardedFor` and count its place **from
+   the right**: the last entry is 1. If your address is not in the list, stop here and leave the variable empty.
+4. Set `CRAWLSPACE_TRUSTED_PROXY_HOPS` to that number in the dashboard and redeploy (this signs you out). Sign in.
+5. Open the address page again: `perAddress` must be `true` and `countedAs` must be your address (for IPv6, its first
+   four groups followed by `::/64`).
+6. Check that the number is not too high, from a terminal (the first command prints a `set-cookie` line; copy the
+   `cs_op=...` part up to the first `;`):
+   ```bash
+   curl -si -X POST https://<your-service>.onrender.com/api/operator/login \
+     -H 'content-type: application/json' -d '{"password":"<your password>"}' | grep -i set-cookie
+   curl -s https://<your-service>.onrender.com/api/operator/client-address \
+     -H 'cookie: cs_op=<value>' -H 'X-Forwarded-For: 198.51.100.77'
+   ```
+   `countedAs` must still be **your** address, with `198.51.100.77` somewhere to its left in `forwardedFor`. If
+   `countedAs` is `198.51.100.77`, the number is too high: lower it by one and repeat. If you cannot get both checks
+   to pass, empty the variable again.
 
 ### The owner's steps, in order
 
@@ -141,9 +190,13 @@ pass: D-61.)
    fail or the service restarts during a scan, move up one size. Check the price on Render's pricing page that day.
    The region defaults to `oregon` and cannot be changed later; add `region:` to `render.yaml` first if you want another.
 4. **Set the secrets** when Render asks for the `sync: false` values:
-   - `CRAWLSPACE_OPERATOR_PASSWORD`: leave it unset (see the caveat above). If the form will not accept an empty
-     value (not verified), enter a placeholder shorter than 12 characters: the app keeps the operator page off for any
-     password under 12 characters (`MIN_PASSWORD_LENGTH` in `src/server/operator-auth.ts`). Delete the variable afterwards.
+   - `CRAWLSPACE_OPERATOR_PASSWORD`: a long random password, at least 12 characters, **only if the deployed commit
+     includes the operator-login fixes** (the `fix/operator-login` pull request; see "Operator sign-in" above). On any
+     earlier commit leave it unset. To keep the page off: leave it empty, or, if the form will not accept an empty
+     value (not verified), enter a placeholder shorter than 12 characters (`MIN_PASSWORD_LENGTH` in
+     `src/server/operator-auth.ts`) and delete the variable afterwards.
+   - `CRAWLSPACE_TRUSTED_PROXY_HOPS`: leave it empty for now (step 8). If the form will not accept an empty value
+     (not verified), enter `0`: it means the same.
    - `ANTHROPIC_API_KEY`: optional. Unset means the template fix list (D-25).
    - `HUBSPOT_PORTAL_ID`, `HUBSPOT_FORM_GUID`: leave unset. They are read only when `CRAWLSPACE_HUBSPOT_ENABLED=1`,
      which `render.yaml` does not set (D-36).
@@ -155,8 +208,10 @@ pass: D-61.)
    three things CI cannot show: Chromium rendering on Render, outbound connections from Render, and the disk. Then
    restart the service in the dashboard and open the same report link again: it must still be there (the database is
    on the disk).
-8. **Sign in to `/operator` only after the caveat is resolved**: fix items 1, 2 and 5, deploy that, then set a long
-   random `CRAWLSPACE_OPERATOR_PASSWORD` in the dashboard and sign in once over HTTPS.
+8. **Sign in to `/operator`** once over HTTPS (with the operator-login fixes deployed and the password set). Check
+   in the browser's developer tools that the `cs_op` cookie is marked `Secure` and `HttpOnly` ("Not verified" 8).
+   Then follow "Finding `CRAWLSPACE_TRUSTED_PROXY_HOPS` on Render" above. Expect to sign in again after every deploy
+   or restart.
 9. **Set up SQLite backups**: the file holds lead emails. Render's daily disk snapshots are a fallback, not a
    database backup (see above). The database runs in WAL mode, so a plain copy of `crawlspace.db` alone can miss
    recent writes: use SQLite's own backup (the `sqlite3` tool's `.backup` command, or `VACUUM INTO`) and keep the copy
@@ -188,14 +243,21 @@ Each of these is a "check it on the day" item, not a known problem.
 10. **A scan inside the image.** CI proves Chromium launches in the image and the app answers; no full crawl has been
     run in it. Step 7 is the first one. (`scripts/check-migrations.sh` cannot run in the agent sandbox, D-26, but CI
     runs it and it passed on this branch; there is no schema change.)
+11. **`X-Forwarded-For` on Render.** How many proxies write to it, whether a client-sent value is kept, and whether
+    the app's port can be reached without passing Render's proxy. Render's docs read in these runs do not say (D-78).
+    Until step 8's check is done, `CRAWLSPACE_TRUSTED_PROXY_HOPS` stays empty and the sign-in limit is shared by all
+    addresses.
 
 ## Before going public (any option)
 
 - [x] Decide on D-08: Render (owner, 2026-11-18; D-65). The domain is still open.
 - [ ] Confirm Render allows direct outbound connections to arbitrary hosts and ports (the crawler ignores proxies by
       design, D-22). **Not verified**: Render's docs do not state it (see "Not verified" 1).
-- [ ] Fix the operator-login should-fix items (`NEXT.md` "Review run" 1, 2, 5; D-44, D-72) before turning `/operator` on.
+- [x] Fix the operator-login should-fix items (`NEXT.md` "Review run" 1, 2, 5; D-44, D-72): done on
+      `fix/operator-login` (D-76, D-77, D-79). Merge and deploy that before turning `/operator` on.
 - [ ] Then set `CRAWLSPACE_OPERATOR_PASSWORD` (long, random) and sign in once over HTTPS.
+- [ ] Find and set `CRAWLSPACE_TRUSTED_PROXY_HOPS` (step 8). Until then anyone can keep the operator locked out with
+      10 wrong passwords every 15 minutes (D-78).
 - [ ] Decide whether to flip HubSpot on; if so create the form (with an `email` field), set the three variables,
       submit one test email and check it arrives in HubSpot (never tested live in the build runs).
 - [ ] Decide what the gate note under the email field should say about privacy, and link a privacy page if one

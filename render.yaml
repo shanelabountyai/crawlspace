@@ -38,7 +38,11 @@ services:
       # Secrets: declared without values. Render asks for them when the Blueprint is first created; the owner types
       # them in the dashboard. PORT is not set here: Render provides it (default 10000) and the container honours it.
       # CRAWLSPACE_HUBSPOT_ENABLED is deliberately not declared, so HubSpot stays off (D-36).
-      - key: CRAWLSPACE_OPERATOR_PASSWORD # leave unset for now: see docs/DEPLOY.md "Operator sign-in caveat"
+      - key: CRAWLSPACE_OPERATOR_PASSWORD # long and random, at least 12 characters; unset = operator page off (docs/DEPLOY.md "Operator sign-in")
+        sync: false
+      # Not a secret. Leave it EMPTY at first: the right number is found on the running service (docs/DEPLOY.md
+      # "Operator sign-in", D-78). Empty = sign-in attempts from every address share one limit. Too high is worse than empty.
+      - key: CRAWLSPACE_TRUSTED_PROXY_HOPS
         sync: false
       - key: ANTHROPIC_API_KEY # optional: unset means the template fix list (D-25)
         sync: false

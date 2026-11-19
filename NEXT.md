@@ -1,5 +1,45 @@
 # Crawlspace — next
 
+## Operator-login fixes (scheduled run, 2026-11-19, branch `fix/operator-login`)
+
+One draft PR ("Crawlspace: operator-login fixes (limiter race, lockout, session token)"), not merged. **Nothing was
+deployed**; no hosting account, environment variable or secret was touched. It fixes the three operator-login items
+that kept `/operator` off (D-44, D-72), so the page can be turned on once this is merged and deployed.
+
+- **Item 1, limiter race (D-76):** "is this address full?", the password comparison and the count are now one
+  synchronous step after the body is read. 40 wrong passwords sent at once: 10 compared, 30 refused unchecked.
+- **Item 2, lockout (D-77, D-78):** one limit per client address instead of one for everybody; after 50 wrong
+  passwords from all addresses in 15 minutes, checks slow to one a second in an ordered, bounded line. **This needs
+  `CRAWLSPACE_TRUSTED_PROXY_HOPS`, which is unset by default** because the right number for Render is not documented
+  and a number that is too high is worse than none. Until Shane sets it (hand step 3), anyone can still keep the
+  operator locked out with 10 wrong passwords every 15 minutes; guessing stays bounded either way.
+- **Item 5, session token (D-79):** signed with a random key that lives only in the running process, not with the
+  password. A restart or deploy signs the operator out; signing out ends the session everywhere. No new secret.
+- **Item 7, first half:** tests drive the login route's 429 path (JSON and form).
+- **Also in the PR:** sign-in bodies over 8,192 bytes refused unread; a malformed cookie is 401 instead of an error;
+  `GET /api/operator/client-address` (signed in only) to find the proxy number; the sign-in page has a fixed
+  "Sign-in is busy" sentence (D-80).
+- **Security review (D-81):** two passes by agents that had not seen the work. Pass 1: 3 must-fix, all fixed by a
+  redesign with tests. Pass 2: 0 must-fix. The rest is listed in the PR.
+- **Not changed:** scoring, checks, D-34 bands, the SSRF guard, the crawler, the public scan/report/PDF flow,
+  the schema (no migration), `tests/unit/single-path.test.ts`. No test deleted, skipped or weakened; the existing
+  operator tests are untouched.
+- **Local gate:** `npm ci` (Prisma schema engine stubbed, D-26), lint, typecheck, `npm test` 405/405 (26 files; was
+  347 in 24), build, e2e 18/18 (was 17): all exit 0. `scripts/check-migrations.sh` cannot run here (D-26); CI decides
+  it. Docker cannot build here (D-71); the `docker` CI job decides the image. CI results are in the PR description.
+- **Residual risk:** `docs/DEPLOY.md` "Operator sign-in" lists six items; D-77 to D-79 have the reasoning.
+- **Still open from the review list below:** item 4 (PDF-gate rate limit), item 6 (`single-path.test.ts` allowlist,
+  needs the owner's OK), item 7 second half (PDF "deterministic bytes" test).
+
+**Shane's hand steps for this PR:**
+
+1. Review the draft PR; merge it once both CI jobs are green. Claude does not merge.
+2. Deploy that commit on Render, then set a long random `CRAWLSPACE_OPERATOR_PASSWORD` (12 characters or more) and
+   sign in once over HTTPS; check the `cs_op` cookie is `Secure` and `HttpOnly`.
+3. Follow `docs/DEPLOY.md` "Finding `CRAWLSPACE_TRUSTED_PROXY_HOPS` on Render" (about ten minutes, signed in). Until
+   then the sign-in limit is shared by all addresses.
+4. Expect to sign in again after every deploy or restart.
+
 ## Report title fix (2026-11-19, branch `fix/report-title-race`)
 
 PR #7 (deploy files) was merged by Claude on the owner's instruction on 2026-11-19; nothing is deployed. CI on the merge
@@ -38,31 +78,35 @@ CLI was touched, no environment variable or secret was set anywhere, and `render
   report page swaps from progress to report (`generateMetadata` in `src/app/scans/[id]/page.tsx`); that cause is a
   guess, not a finding.
 
-**Operator sign-in caveat (carry this forward).** The Phase 4 review's operator-login should-fix items below
-("Review run", items 1, 2 and 5: limiter checked before the body is read, one global lockout counter, session token
-keyed directly by the password) are **still open**, and D-44 says to revisit them before any deploy. They were out of
-scope for this run. **Recommendation: leave `CRAWLSPACE_OPERATOR_PASSWORD` unset on Render (operator page off) until
-they are fixed** (D-72). Item 3 (`?pdf=` text on the page, and `/operator?error=`) was checked: the design pass
-already fixed it (D-61; codes map to fixed sentences in `src/lib/report/words.ts`, tested in
-`tests/unit/present.test.ts` and `e2e/scan.spec.ts`).
+**Operator sign-in (was: caveat).** The Phase 4 review's operator-login items 1, 2 and 5 are fixed on
+`fix/operator-login` (D-76, D-77, D-79; see the top section). What is true now: the limit holds for requests that
+arrive together; a stolen cookie gives no way to test password guesses offline; a restart, a deploy, a password change
+or signing out ends the session. What remains: per-address limiting, and with it protection against being locked out
+by someone else, starts only when `CRAWLSPACE_TRUSTED_PROXY_HOPS` is set after a check on Render (D-78); during a
+flood from many networks sign-in can answer "busy"; a copied cookie works until it expires (12 h), sign-out or a
+restart. **`CRAWLSPACE_OPERATOR_PASSWORD` may be set once that PR is merged and deployed, not before.** Item 3
+(`?pdf=` text on the page, and `/operator?error=`) was already fixed by the design pass (D-61; codes map to fixed
+sentences in `src/lib/report/words.ts`, tested in `tests/unit/present.test.ts` and `e2e/scan.spec.ts`).
 
 **Not verified** (full list with reasons in `docs/DEPLOY.md` "Not verified", 10 items): outbound connections from
 Render to arbitrary hosts and ports (D-22; Render's docs only say port 25 is blocked); the image building and running
 on Render itself; who owns the disk mount; memory on any instance type; shared memory / init for Chromium on Render;
 the minimum disk size; Blueprint creation details (empty `sync: false` values, first deploy with auto-deploy off);
 the `x-forwarded-proto` header on Render; prices (none quoted); a full scan inside the image (CI only proves Chromium
-launches there).
+launches there). Item 11, added by the operator-login run: what `X-Forwarded-For` holds on Render.
 
 **Shane's hand steps, in order** (details in `docs/DEPLOY.md` "The owner's steps"):
 
 1. Review the draft PR; merge it once both CI jobs are green. Claude does not merge.
 2. In Render, create a Blueprint from this repository (`render.yaml`).
 3. Pick a paid instance type (a disk needs one); check the price that day.
-4. Set the secrets: leave `CRAWLSPACE_OPERATOR_PASSWORD` unset; `ANTHROPIC_API_KEY` optional; HubSpot IDs unset.
+4. Set the secrets: `CRAWLSPACE_OPERATOR_PASSWORD` only if the deployed commit has the operator-login fixes (else
+   leave it unset); `CRAWLSPACE_TRUSTED_PROXY_HOPS` empty; `ANTHROPIC_API_KEY` optional; HubSpot IDs unset.
 5. Start the first deploy (auto-deploy is off).
 6. Check `https://<service>.onrender.com/api/health` → 200 `{"status":"ok"}`.
 7. Run one scan of a site you own; restart the service; open the report again (proves Chromium, outbound, disk).
-8. Sign in to `/operator` only after items 1, 2 and 5 are fixed and deployed.
+8. Sign in to `/operator` (items 1, 2 and 5 are fixed on `fix/operator-login`: deploy that first), then find and set
+   `CRAWLSPACE_TRUSTED_PROXY_HOPS` (`docs/DEPLOY.md`).
 9. Set up SQLite backups (the file holds lead emails).
 
 ## Design pass (scheduled run, 2026-11-18, branch `design/impl`)
@@ -110,17 +154,21 @@ missed**, now fixed: scan ids starting with "-" (≈ 1 in 64) were exported as `
 `scan_id` in the CSVs matched no scan (D-46; `newScanId()` no longer emits a leading "-"; test in `csv.test.ts`). Gate re-run on
 5360a42: `npm ci` (Prisma schema-engine stubbed, D-26), lint, typecheck, `npm test` 335/335 after the fix, build, e2e 7/7 — all exit 0.
 CI on b200f46: pull_request run green, push run red on a CS-02 timing race in Phase 2 code (999 ms gap; D-45). Fixed
-on this PR (D-47): the limiter returns the granted start time and the fetcher logs it. Should-fix, to do before any deploy:
+on this PR (D-47): the limiter returns the granted start time and the fetcher logs it. Should-fix, to do before any deploy
+(status as of the operator-login run, 2026-11-19: 1, 2, 5 and the first half of 7 **done** on `fix/operator-login`;
+3 **done** earlier; 4, 6 and the second half of 7 **still open**):
 
 1. Login limiter: `blocked()` runs before the body is read and `fail()` after, so concurrent requests skip the 10/15 min
-   limit (`src/app/api/operator/login/route.ts:15-23`).
+   limit (`src/app/api/operator/login/route.ts:15-23`). **Done: D-76.**
 2. Login limiter is one global counter checked before the password: anyone can keep the operator locked out.
+   **Done: D-77, D-78** (per-address limiting takes effect once `CRAWLSPACE_TRUSTED_PROXY_HOPS` is set).
 3. `/scans/<id>?pdf=<text>` shows arbitrary text in the alert box on the branded page (escaped, not XSS); use error codes.
-   Same pattern on `/operator?error=`.
-4. PDF-gate rate limit is count-then-insert without a transaction; concurrent posts can exceed 10/scan/hour.
-5. Session token is HMAC keyed directly by the password: a stolen cookie allows an offline dictionary attack.
-6. `single-path.test.ts` allowlist widened to include `hubspot.ts` (D-42): needs the owner's explicit OK.
+   Same pattern on `/operator?error=`. **Done earlier: D-61.**
+4. PDF-gate rate limit is count-then-insert without a transaction; concurrent posts can exceed 10/scan/hour. **Still open.**
+5. Session token is HMAC keyed directly by the password: a stolen cookie allows an offline dictionary attack. **Done: D-79.**
+6. `single-path.test.ts` allowlist widened to include `hubspot.ts` (D-42): needs the owner's explicit OK. **Still open.**
 7. No test drives the login route's 429 path; the PDF "deterministic bytes" test compares extracted text, not bytes.
+   **First half done** (`tests/server/operator-login-route.test.ts`); **second half still open.**
 
 ## Owner hand steps
 

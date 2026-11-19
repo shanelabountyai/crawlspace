@@ -27,6 +27,7 @@ Failed and partial checks become a ranked fix list (`src/lib/fixlist/`). With `A
 | `ANTHROPIC_API_KEY` | unset → templates | enables the AI-written fix list |
 | `CRAWLSPACE_FIXLIST_MODEL` | `claude-sonnet-4-5` | model for the fix list (D-31) |
 | `CRAWLSPACE_OPERATOR_PASSWORD` | unset → `/operator` off | operator page password, at least 12 characters (D-39) |
+| `CRAWLSPACE_TRUSTED_PROXY_HOPS` | unset → trust no forwarded address | how many proxies in front of the app write to `X-Forwarded-For` (1 to 5); sign-in attempts are then limited per client address (D-78). Set it only after checking on the host: too high is worse than unset (`docs/DEPLOY.md`) |
 | `CRAWLSPACE_HUBSPOT_ENABLED` | unset → off | `1` also submits PDF-gate emails to a HubSpot form (D-05, D-36) |
 | `HUBSPOT_PORTAL_ID`, `HUBSPOT_FORM_GUID` | unset | the HubSpot form, needed only when the flag is `1` |
 
@@ -40,7 +41,7 @@ The report page shows the overall score over 100 and an A–F grade per category
 
 ## Operator page
 
-`/operator`, password from `CRAWLSPACE_OPERATOR_PASSWORD`, no accounts (D-39). It lists submitted scans (score, grades, lead count), the latest leads and whether HubSpot is on; each scan can be opened, rerun (a new scan of the same URL through the normal guarded path; the old one is kept) or downloaded as a PDF; scans and leads export as CSV (D-40).
+`/operator`, password from `CRAWLSPACE_OPERATOR_PASSWORD`, no accounts (D-39). Sign-in: 10 wrong passwords in 15 minutes lock the address they came from (every address together until `CRAWLSPACE_TRUSTED_PROXY_HOPS` is set); under a flood of wrong passwords from many addresses sign-in slows to one check a second and may answer "Sign-in is busy" (D-76 to D-78). The session lasts 12 hours and ends when you sign out, when the service restarts or deploys, or when the password changes (D-79). It lists submitted scans (score, grades, lead count), the latest leads and whether HubSpot is on; each scan can be opened, rerun (a new scan of the same URL through the normal guarded path; the old one is kept) or downloaded as a PDF; scans and leads export as CSV (D-40).
 
 ## Deploy
 
@@ -50,7 +51,7 @@ Not deployed. The owner chose Render on 2026-11-18 (D-08, D-65). The repo holds 
 - `render.yaml`: one Docker web service, one instance, a disk at `/data` for SQLite, health check `GET /api/health`, auto-deploy off, secret keys without values.
 - CI job `docker`: builds the image and runs `scripts/docker-smoke.sh` (health route and home page must answer 200).
 
-`docs/DEPLOY.md` has the owner's steps in order, what is not verified, and one caveat: leave `CRAWLSPACE_OPERATOR_PASSWORD` unset on Render until the operator-login items in `NEXT.md` are fixed (D-72).
+`docs/DEPLOY.md` has the owner's steps in order and what is not verified. The operator-login items that kept `/operator` off (D-72) are fixed (D-76 to D-79); "Operator sign-in" there says what holds now, what does not, and the one setting to check on Render before relying on it.
 
 ## Demo script
 
