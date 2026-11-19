@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Scanning</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>
+body{margin:0;background:#F7F7F4}
+a{color:#0F5E63}a:hover{color:#0A4347}
+</style>
+</helmet>
+<div style="min-height: 100%; background: #F7F7F4; color: #16181D; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.5;">
+<header style="background: #FFFFFF; border-bottom: 1px solid #D9D9D2;">
+<div style="max-width: 1120px; margin: 0 auto; padding: 14px 24px; display: flex; align-items: center; gap: 10px;">
+<svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><rect x="1" y="1" width="26" height="26" rx="7" fill="#16181D"/><path d="M9 7v11a3 3 0 0 0 3 3h7" stroke="#7FD1CF" stroke-width="2.4" fill="none" stroke-linecap="round"/><circle cx="19" cy="9" r="2.4" fill="#7FD1CF"/></svg>
+<span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-size: 18px;">Lab Intelligence</span>
+<span style="color: #565B66; font-size: 15px;">/ Crawlspace</span>
+</div>
+</header>
+<main style="max-width: 760px; margin: 0 auto; padding: 48px 24px 64px; display: flex; flex-direction: column; gap: 24px;">
+<div style="display: flex; flex-direction: column; gap: 8px;">
+<span style="font-size: 15px; color: #565B66;">Scanning northwind-outfitters.example · Ecommerce</span>
+<h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 30px; font-weight: 700;">Reading page 7 of up to 15</h1>
+<p style="margin: 0; color: #3E434D;">We read one page a second so we never slow your site down. About 10 seconds left; you can keep this tab in the background.</p>
+</div>
+<div role="progressbar" aria-label="Pages read" aria-valuemin="0" aria-valuemax="15" aria-valuenow="7" style="height: 10px; border-radius: 5px; background: #E4E4DE; overflow: hidden;"><div style="height: 10px; width: 46%; background: #0F5E63;"></div></div>
+<ol aria-live="polite" style="margin: 0; padding: 0; list-style: none; background: #FFFFFF; border: 1px solid #D9D9D2; border-radius: 14px;">
+<sc-for list="{{pages}}" as="p" hint-placeholder-count="8">
+<li style="display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-top: {{p.rule}};">
+<span style="flex: 0 0 auto; min-width: 104px; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: {{p.fg}};"><span aria-hidden="true">{{p.g}}</span>{{p.w}}</span>
+<code style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, Menlo, monospace; font-size: 14px; color: {{p.ink}};">{{p.u}}</code>
+<span style="flex: 0 0 auto; font-size: 13px; color: #565B66;">{{p.note}}</span>
+</li>
+</sc-for>
+</ol>
+<p style="margin: 0; font-size: 14px; color: #565B66;">If your robots.txt blocks CrawlspaceBot, we stop and show that as a result. It's a finding, not an error.</p>
+</main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":780}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const done = { w: 'Read', g: '✓', fg: '#1D4F91', ink: '#16181D' };
+    const now = { w: 'Reading', g: '●', fg: '#0F5E63', ink: '#16181D' };
+    const wait = { w: 'Waiting', g: '○', fg: '#565B66', ink: '#565B66' };
+    const rows = [
+      ['/', done, 'robots.txt allows us'], ['/robots.txt', done, ''], ['/sitemap.xml', done, '214 products'],
+      ['/collections/jackets', done, ''], ['/products/trail-jacket', done, 'with and without JS'], ['/products/summit-pack', done, 'with and without JS'],
+      ['/cart', now, ''], ['/llms.txt', wait, ''], ['/products/ridge-boot', wait, '']
+    ];
+    const pages = rows.map(([u, s, note], i) => ({ u, note, w: s.w, g: s.g, fg: s.fg, ink: s.ink, rule: i === 0 ? 'none' : '1px solid #E4E4DE' }));
+    return { pages };
+  }
+}
+</script>
+</body>
+</html>

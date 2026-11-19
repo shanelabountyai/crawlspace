@@ -2,7 +2,7 @@
 
 Agent-readiness scanner: point it at a site, get a scorecard of how well AI agents can read and act on it, plus a ranked fix list.
 
-Build-log #25. Status: **Phase 4 (lead capture, operator page, PDF export, deploy notes)** on top of Phases 1–3 (engine, crawler, web UI). Not deployed (see `docs/DEPLOY.md`). Spec in `docs/PRD.md`, plans in `docs/PHASE1_PLAN.md` … `docs/PHASE4_PLAN.md`, decisions in `docs/DECISIONS.md`, hand-off in `NEXT.md`.
+Build-log #25. Status: **Phase 4 (lead capture, operator page, PDF export, deploy notes)** on top of Phases 1–3 (engine, crawler, web UI), plus the **design pass** (Claude Design look from `docs/design/`, gap screens, design/UX/accessibility review; PRD §9). Not deployed (see `docs/DEPLOY.md`). Spec in `docs/PRD.md`, plans in `docs/PHASE1_PLAN.md` … `docs/PHASE4_PLAN.md`, decisions in `docs/DECISIONS.md`, hand-off in `NEXT.md`.
 
 ```bash
 npm install                            # also runs `prisma generate`
@@ -57,12 +57,12 @@ A reviewer can run this on any machine with Node 22; it needs no internet after 
    npm run demo                        # builds, then serves the app on http://127.0.0.1:7901
    ```
    Wait for the line `operator page /operator, password: crawlspace-demo-operator`. The database is a fresh temp file each run.
-2. Open http://127.0.0.1:7901, enter `http://walledshop.test:7911/` and press **Scan site**. The progress box shows while the polite crawl runs (about 10 seconds).
-3. Read the report: the overall score over 100 in the ring, a letter grade on each of the six categories, "Crawlspace by Lab Intelligence" at the top and the address in the footer. The fix list says 3 AI suggestions were dropped (a recorded model reply that invents things; CS-04).
-4. At the bottom, under **Download this report as a PDF**, try `not-an-email` (the browser refuses it), then enter any address such as `reviewer@example.com` and press **Download PDF**. Open the file: branded header and footer on every page, the score over 100, the grades, the fix list and every check.
+2. Open http://127.0.0.1:7901, enter `http://walledshop.test:7911/` and press **Scan my site**. The progress box shows while the polite crawl runs (about 10 seconds).
+3. Read the report: the overall score over 100 with a readiness word, a letter grade on each of the six categories, "Lab Intelligence / Crawlspace" at the top and the address in the footer. The fix list says 3 AI suggestions were dropped (a recorded model reply that invents things; CS-04).
+4. At the bottom, under **Take this report to your team**, try `not-an-email` (refused: "Check the address."), then enter any address such as `reviewer@example.com` in **Work email** and press **Download PDF**. Open the file: branded header and footer on every page, the score over 100, the grades, the fix list and every check.
 5. Scan `http://goodshop.test:7911/` too: every applicable check passes and the fix list says there is nothing to fix.
-6. Open http://127.0.0.1:7901/operator. Try a wrong password (refused), then sign in with `crawlspace-demo-operator`. Both scans are listed with their score, grades and lead count; your email is under **Latest leads** with HubSpot `off`.
-7. Press **Rerun** on a scan, then **open the new scan**: a new report for the same URL; back on `/operator` both scans are listed.
+6. Open http://127.0.0.1:7901/operator. Try a wrong password (refused), then sign in with `crawlspace-demo-operator`. Both scans are listed (plus any earlier ones in this run) with their score, grades and lead count; your email is under **Latest leads** with HubSpot `off`.
+7. Press **Rerun** on a scan, then **Open the new scan**: a new report for the same URL; back on `/operator` both scans are listed.
 8. Press **Export scans (CSV)** and **Export leads (CSV)**, and **PDF** on a row (the operator's copy skips the email gate). Press **Sign out**.
 9. Stop the demo with Ctrl+C.
 

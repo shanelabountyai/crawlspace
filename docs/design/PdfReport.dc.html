@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PDF report, page 1</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>body{margin:0;background:#D9D9D2}</style>
+</helmet>
+<!-- Gap design (2026-11-18, design pass): the PDF export (D-37), A4 at 96 dpi (794×1123). Drawn with pdf-lib and the
+     standard Helvetica fonts, so: no web fonts, no glyphs outside Latin-1 (the status WORD carries the meaning, colour
+     follows it), no logo file (D-33: text wordmark). Every page gets the header band and the footer with the address
+     and "Page n of N". Values are [placeholders]. -->
+<div style="width: 794px; height: 1123px; box-sizing: border-box; background: #FFFFFF; color: #16181D; font-family: Helvetica, Arial, sans-serif; display: flex; flex-direction: column;">
+<div style="background: #16181D; color: #FFFFFF; padding: 22px 66px; display: flex; justify-content: space-between; align-items: baseline;">
+<span style="font-weight: 700; font-size: 14px;">Lab Intelligence <span style="color: #7FD1CF;">/ Crawlspace</span></span>
+<span style="font-size: 12px; color: #C9CBD1;">Agent-readiness report</span>
+</div>
+<div style="flex: 1; padding: 32px 66px; display: flex; flex-direction: column; gap: 18px;">
+<div style="display: flex; flex-direction: column; gap: 4px;">
+<span style="font-weight: 700; font-size: 20px;">[https://site.example/]</span>
+<span style="font-size: 12px; color: #565B66;">Scanned [date, UTC] · site type [ecommerce] ([detected]) · rubric v[1]</span>
+</div>
+<div style="border: 1px solid #D9D9D2; border-radius: 8px; padding: 18px; display: flex; gap: 32px; align-items: center;">
+<div style="display: flex; flex-direction: column;">
+<span style="font-size: 11px; font-weight: 700; color: #565B66; letter-spacing: 0.06em;">AGENT-READINESS SCORE</span>
+<span style="font-weight: 700; font-size: 40px;">[score] <span style="font-size: 18px; color: #565B66; font-weight: 400;">/ 100</span></span>
+<span style="font-size: 13px; font-weight: 700; color: #6B4100;">[Partly ready]</span>
+</div>
+<div style="flex: 1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 18px; font-size: 13px;">
+<sc-for list="{{cats}}" as="c" hint-placeholder-count="6"><span><strong style="color: {{c.fg}}; display: inline-block; width: 22px;">{{c.g}}</strong>{{c.name}} <span style="color: #565B66;">[nn.n]/100</span></span></sc-for>
+</div>
+</div>
+<span style="font-size: 10px; color: #565B66;">Grades: A 90+, B 80+, C 70+, D 60+, F below 60. Checks that do not apply to this site are left out of the score.</span>
+<span style="font-weight: 700; font-size: 16px; color: #0F5E63;">Fix these first</span>
+<div style="display: flex; flex-direction: column; gap: 10px; font-size: 12px;">
+<sc-for list="{{fixes}}" as="f" hint-placeholder-count="3"><div style="display: flex; flex-direction: column; gap: 2px;"><strong style="font-size: 13px;">{{f}}. [Fix title]  [B1]</strong><span style="padding-left: 14px; color: #3E434D;">[Why it matters]</span><span style="padding-left: 14px;">Fix: [what to change]</span><span style="padding-left: 14px; font-size: 10px; color: #565B66;">Evidence: [URL]</span></div></sc-for>
+</div>
+<span style="font-weight: 700; font-size: 16px; color: #0F5E63;">Every check</span>
+<div style="display: flex; flex-direction: column; font-size: 12px;">
+<sc-for list="{{checks}}" as="k" hint-placeholder-count="4"><div style="border-top: 1px solid #E4E4DE; padding: 6px 0; display: flex; justify-content: space-between;"><strong>[ID]  [Check title]</strong><span><span style="color: #565B66; font-size: 10px;">weight [n]  </span><strong style="color: {{k.fg}};">{{k.w}}</strong></span></div></sc-for>
+</div>
+</div>
+<div style="border-top: 1px solid #D9D9D2; margin: 0 66px; padding: 10px 0 28px; display: flex; justify-content: space-between; font-size: 10px; color: #565B66;">
+<span>Lab Intelligence · 9905 S Pennsylvania Ave, Oklahoma City, OK 73159<br>[https://site.example/]</span>
+<span>Page [1] of [N]</span>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":794,"height":1123}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const tone = { good: '#1D4F91', mid: '#6B4100', bad: '#9A2E0B', na: '#565B66' };
+    const cats = [['A', 'Access', 'good'], ['B', 'Readable without JavaScript', 'bad'], ['C', 'Structured data', 'mid'], ['D', 'Machine guidance', 'bad'], ['E', 'Actionability', 'mid'], ['F', 'Speed', 'good']]
+      .map(([k, name, t]) => ({ g: '[' + k + ']', name, fg: tone[t] }));
+    const checks = [['Pass', 'good'], ['Partial', 'mid'], ['Fail', 'bad'], ['N/A', 'na']].map(([w, t]) => ({ w, fg: tone[t] }));
+    return { cats, checks, fixes: ['1', '2', '3'] };
+  }
+}
+</script>
+</body>
+</html>

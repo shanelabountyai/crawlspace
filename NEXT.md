@@ -1,5 +1,26 @@
 # Crawlspace — next
 
+## Design pass (scheduled run, 2026-11-18, branch `design/impl`)
+
+Built the Claude Design look (`docs/design/`) into every page, designed and built the gap screens, ran three
+independent reviews (design fidelity, UX, accessibility) and fixed what they found. Presentation only: scores, D-34
+bands, checks, schema and JSON API contracts unchanged. One PR, not merged.
+
+- **Built:** tokens light + dark (D-48), header/footer with the canvas mark (D-54), scan form, progress, report
+  (desktop + 390 px), PDF panel, scan stopped / robots finding, not-found, operator sign-in / turned off / signed in,
+  PDF restyle (D-57, D-64).
+- **Gap artboards added:** Operator, OperatorSignIn, LeadStates, ScanOutcomes, PdfReport (in `canvas.json`).
+- **Left out on purpose:** site-type picker (D-51, needs an API field), per-page progress (D-50), "Up to +N" gains
+  (D-53), emailed PDF (D-52).
+- **Review fixes:** D-60..D-64; PRD §9 DR-1..DR-12. axe: 0 violations on 9 screens in light and dark (`e2e/a11y.spec.ts`).
+- **Not fixed (listed in the PR):** A2 evidence names `rules/agents.json` (engine text); operator failed rows don't
+  show the reason (needs `listScans` to return `error`); px font sizes, not rem; scores keep one decimal (D-34).
+- **Local gate:** npm ci, lint, typecheck, npm test 344/344, build, e2e 15/15 all exit 0. `scripts/check-migrations.sh`
+  can't run here (Prisma schema engine stubbed, D-26), so CI decides it; no schema change in this pass.
+
+**Shane's hand steps:** open the Design canvas (https://claude.ai/artifact/YWkK9NBQxuzFhvWeVhVU45) and add the five gap
+artboards if you want them there; run the README demo; review the PR; merge or not.
+
 Written at the end of the Phase 4 run (2026-11-18, branch `phase-4`, PR "Crawlspace Phase 4: lead capture, operator
 page, PDF export, deploy notes"). Phases 1–4 of PRD §8 are built; nothing is deployed.
 

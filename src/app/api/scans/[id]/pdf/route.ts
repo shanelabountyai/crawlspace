@@ -1,3 +1,4 @@
+import { pdfErrorCode } from "@/lib/report/words";
 import { getLeadService } from "@/server/scan-service";
 
 export const runtime = "nodejs";
@@ -20,7 +21,7 @@ export async function POST(req: Request, ctx: { params: Promise<{ id: string }> 
   const r = await (await getLeadService()).requestPdf(id, email, pageUri);
   if (!r.ok) {
     if (isJson || r.status === 404) return Response.json({ error: r.error }, { status: r.status });
-    return new Response(null, { status: 303, headers: { location: `/scans/${encodeURIComponent(id)}?pdf=${encodeURIComponent(r.error)}#pdf-h` } });
+    return new Response(null, { status: 303, headers: { location: `/scans/${encodeURIComponent(id)}?pdf=${pdfErrorCode(r.status)}#pdf-h` } });
   }
   return new Response(Buffer.from(r.pdf.bytes), {
     headers: {

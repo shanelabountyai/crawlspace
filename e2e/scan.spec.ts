@@ -5,16 +5,16 @@ const site = (host: string) => `http://${host}:${SITES}/`;
 
 async function startScan(page: import("@playwright/test").Page, url: string) {
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Crawlspace" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 1, name: "Can AI agents shop, book or buy on your site?" })).toBeVisible();
   await page.getByLabel("Website address").fill(url);
-  await page.getByRole("button", { name: "Scan site" }).click();
+  await page.getByRole("button", { name: "Scan my site" }).click();
   await expect(page).toHaveURL(/\/scans\/[A-Za-z0-9_-]{16}$/);
 }
 
 test("scans a good fixture shop end to end: crawl → score → report, nothing to fix", async ({ page }) => {
   await startScan(page, site("goodshop.test"));
   await expect(page.getByTestId("scan-status")).toHaveAttribute("data-status", "done");
-  await expect(page.getByTestId("site-type")).toHaveText("ecommerce");
+  await expect(page.getByTestId("site-type")).toHaveText("Ecommerce");
   await expect(page.getByTestId("final-url")).toHaveText(site("goodshop.test"));
   const rows = page.getByTestId("checks").locator("tbody tr");
   await expect(rows).toHaveCount(18);
@@ -57,8 +57,10 @@ test("refuses private addresses before scanning (CS-03 through the UI)", async (
     ["file:///etc/passwd", "scheme file: is not allowed"],
   ]) {
     await page.getByLabel("Website address").fill(target!);
-    await page.getByRole("button", { name: "Scan site" }).click();
-    await expect(page.locator("p.form-error")).toContainText(`refused: ${why}`);
+    await page.getByRole("button", { name: "Scan my site" }).click();
+    // the refusal is shown in plain words with the guard's reason verbatim (design pass, D-51)
+    await expect(page.locator(".form-error")).toContainText("Not scanned.");
+    await expect(page.locator(".form-error")).toContainText(why!);
     await expect(page).toHaveURL(/\/$/);
   }
 });
@@ -72,4 +74,44 @@ test("a robots-closed site shows why the scan stopped", async ({ page }) => {
 test("API: unknown scan ids are 404", async ({ request }) => {
   expect((await request.get("/api/scans/AAAAAAAAAAAAAAAA")).status()).toBe(404);
   expect((await request.get("/scans/nope")).status()).toBe(404);
+});
+
+test("design pass: unknown report links get the not-found screen; the report works at 390 px with no sideways scroll", async ({ page }) => {
+  const res = await page.goto("/scans/AAAAAAAAAAAAAAAA");
+  expect(res?.status()).toBe(404);
+  await expect(page.getByTestId("not-found")).toContainText("We can't find that page");
+  await expect(page.getByRole("link", { name: "Scan a site" })).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await startScan(page, site("walledshop.test"));
+  await expect(page.getByTestId("scan-status")).toHaveAttribute("data-status", "done");
+  await expect(page.getByTestId("readiness")).toHaveText(/^.(Ready|Partly ready|Not ready)$/);
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test("without JavaScript: a refused address comes back to the form in plain words, and the progress page reloads itself to the report (D-60, D-61)", async ({ browser }) => {
+  const ctx = await browser.newContext({ javaScriptEnabled: false, baseURL: "http://127.0.0.1:7901" });
+  const page = await ctx.newPage();
+  await page.goto("/");
+  await page.getByLabel("Website address").fill("http://127.0.0.1:7901/");
+  await page.getByRole("button", { name: "Scan my site" }).click();
+  await expect(page).toHaveURL(/\/\?error=scan-refused/);
+  await expect(page.locator(".form-error")).toContainText("We only scan public websites");
+  await page.goto("/");
+  await page.getByLabel("Website address").fill(site("goodshop.test"));
+  await page.getByRole("button", { name: "Scan my site" }).click();
+  await expect(page).toHaveURL(/\/scans\/[A-Za-z0-9_-]{16}$/);
+  await expect(page.getByTestId("scan-status")).toHaveAttribute("data-status", "done");
+  // text in a link never reaches the page: only fixed sentences for known codes
+  await page.goto(page.url() + "?pdf=" + encodeURIComponent("Your account is suspended. Call 555-0100"));
+  await expect(page.getByTestId("pdf-error")).not.toContainText("555-0100");
+  await ctx.close();
+});
+
+test("a robots-closed site is shown as a finding, not an error (D-62)", async ({ page }) => {
+  await startScan(page, site("closed.test"));
+  await expect(page.getByTestId("scan-status")).toHaveAttribute("data-status", "failed");
+  await expect(page.getByRole("heading", { level: 1 })).toHaveText("This site asks crawlers not to read it");
+  await expect(page.getByTestId("scan-error")).toContainText("Finding:");
 });

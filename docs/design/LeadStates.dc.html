@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PDF gate states</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&amp;family=Space+Grotesk:wght@500;600;700&amp;display=swap">
+<style>body{margin:0;background:#F7F7F4}</style>
+</helmet>
+<!-- Gap design (2026-11-18, design pass): the email gate in front of the PDF (D-35, D-38) in every state.
+     The PDF downloads straight away (nothing is emailed, D-38), so the copy says "download", not "we'll send". -->
+<div style="width: 1280px; box-sizing: border-box; padding: 40px; background: #F7F7F4; color: #16181D; font-family: Inter, system-ui, sans-serif; font-size: 16px; line-height: 1.5; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px;">
+<sc-for list="{{states}}" as="s" hint-placeholder-count="5">
+<section style="background: #16181D; color: #F4F4EF; border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px;">
+<span style="align-self: flex-start; font-size: 12px; font-weight: 600; color: #16181D; background: #ECEDEA; border-radius: 6px; padding: 1px 8px;">State: {{s.name}}</span>
+<h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 600;">Take this report to your team</h2>
+<p style="margin: 0; color: #C9CBD1; font-size: 15px;">The report above is free either way. Leave your email to download the full PDF, with every check and its evidence, ready to forward to your developer.</p>
+<div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end;">
+<div style="flex: 1 1 220px; display: flex; flex-direction: column; gap: 6px;">
+<label style="font-size: 14px; font-weight: 600;">Work email</label>
+<input type="email" value="{{s.value}}" style="min-height: 48px; box-sizing: border-box; border-radius: 10px; border: {{s.border}}; background: #22252C; color: #F4F4EF; padding: 0 14px; font: inherit;">
+</div>
+<button type="button" style="min-height: 48px; padding: 0 20px; border-radius: 10px; border: none; background: #7FD1CF; color: #0E1A1B; font: inherit; font-weight: 600; opacity: {{s.op}};">{{s.btn}}</button>
+</div>
+<sc-if value="{{s.msg}}" hint-placeholder-val="{{true}}"><p style="margin: 0; display: flex; gap: 8px; color: {{s.fg}}; font-size: 15px;"><span aria-hidden="true" style="font-weight: 700;">{{s.g}}</span><span><strong>{{s.word}}</strong> {{s.msg}}</span></p></sc-if>
+<p style="margin: 0; color: #C9CBD1; font-size: 13px;">Your email is stored with this scan so Lab Intelligence can follow up about it. It is never shown on a public page.</p>
+</section>
+</sc-for>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":1200}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const ok = '1px solid #8A8F99';
+    const bad = '2px solid #F5B39C';
+    const states = [
+      { name: 'ready', value: '', border: ok, btn: 'Download PDF', op: '1', msg: '' },
+      { name: 'preparing', value: '[you@company.com]', border: ok, btn: 'Preparing…', op: '0.7', msg: '' },
+      { name: 'done', value: '[you@company.com]', border: ok, btn: 'Download PDF', op: '1', g: '✓', word: 'Done.', msg: 'Your PDF is downloading.', fg: '#A9C6F2' },
+      { name: 'invalid email', value: '[not-an-email]', border: bad, btn: 'Download PDF', op: '1', g: '✕', word: 'Check the address.', msg: 'Enter a valid email address to download the PDF.', fg: '#F5B39C' },
+      { name: 'too many requests', value: '[you@company.com]', border: ok, btn: 'Download PDF', op: '1', g: '✕', word: 'Not now.', msg: 'Too many download requests for this report; try again later.', fg: '#F5B39C' }
+    ];
+    return { states, true: true };
+  }
+}
+</script>
+</body>
+</html>
