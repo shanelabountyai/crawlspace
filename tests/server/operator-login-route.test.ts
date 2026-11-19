@@ -177,6 +177,37 @@ describe("login route: the cookie does not let anyone test password guesses offl
     expect(signedIn(again)).toBe(true);
   });
 
+  it("a token is accepted only exactly as issued: altered expiry, signature, encoding or length are all refused", async () => {
+    const t = token(await login(PASSWORD))!;
+    const [exp, sig] = t.split(".") as [string, string];
+    const std = sig.replace(/-/g, "+").replace(/_/g, "/");
+    const altered = [`0${exp}.${sig}`, `${Number(exp) + 1}.${sig}`, `${exp}.${sig}=`, `${exp}.${sig}.`, `${exp}.${sig}A`, `${exp}.${sig.slice(0, -1)}`, `${exp}.${sig.toUpperCase()}`, `${exp}.${std}=`, `${exp}..${sig}`, `${exp}.`, sig];
+    for (const a of altered.filter((a) => a !== t)) expect(signedIn(a), a).toBe(false);
+    expect(signedIn(t)).toBe(true);
+  });
+
+  it("wrong passwords held back and then sent together are still held to the limit", async () => {
+    let open!: () => void;
+    const hold = new Promise<void>((r) => (open = r));
+    const stalled = (i: number) => {
+      const body = new ReadableStream<Uint8Array>({
+        async pull(c) {
+          await hold;
+          c.enqueue(new TextEncoder().encode(JSON.stringify({ password: `wrong password ${i}` })));
+          c.close();
+        },
+      });
+      return POST(new Request("http://app.local/api/operator/login", { method: "POST", headers: { host: "app.local", "content-type": "application/json" }, body, duplex: "half" } as RequestInit));
+    };
+    const all = Array.from({ length: 40 }, (_, i) => stalled(i));
+    // While those bodies are stalled nothing is counted: the operator signs in.
+    expect((await login(PASSWORD)).status).toBe(200);
+    open();
+    const got = (await Promise.all(all)).map((r) => r.status);
+    expect(count(got, 401)).toBe(LOGIN_MAX_FAILURES);
+    expect(count(got, 429)).toBe(40 - LOGIN_MAX_FAILURES);
+  });
+
   it("changing the password signs everyone out (D-39)", async () => {
     const t = token(await login(PASSWORD))!;
     process.env.CRAWLSPACE_OPERATOR_PASSWORD = "a different password";

@@ -181,17 +181,19 @@ describe("LoginGate: a flood of wrong passwords from many addresses slows sign-i
     expect(g.checked.slice(LOGIN_GLOBAL_FREE, LOGIN_GLOBAL_FREE + 3)).toEqual([addr(900), "one-address", "operator"]);
   });
 
-  it("one block of addresses cannot pose as many newcomers: other addresses in an IPv6 /48 or IPv4 /24 that has guessed go behind", async () => {
+  it("one block of addresses cannot pose as many newcomers: other addresses in an IPv6 /56 or IPv4 /24 that has guessed go behind", async () => {
     const g = gateOnClock();
     await flood(g, LOGIN_GLOBAL_FREE);
     const turns = [g.tryOnce(addr(900))];
-    for (let i = 0; i < 6; i++) turns.push(g.tryOnce(`2001:db8:77:${i.toString(16)}::/64`, false, "block-v6"));
+    for (let i = 0; i < 6; i++) turns.push(g.tryOnce(`2001:db8:77:12${i.toString(16).padStart(2, "0")}::/64`, false, "block-v6"));
     for (let i = 2; i < 8; i++) turns.push(g.tryOnce(`203.0.113.${i}`, false, "block-v4"));
     turns.push(g.tryOnce("198.51.100.7", true, "operator"));
     expect((await Promise.all(turns)).at(-1)).toBe("right");
     // First of each block is level with the operator and arrived earlier; everything else from the blocks is behind.
     expect(g.checked.slice(LOGIN_GLOBAL_FREE, LOGIN_GLOBAL_FREE + 4)).toEqual([addr(900), "block-v6", "block-v4", "operator"]);
-    expect(networkOf("2001:db8:77:5::/64")).toBe("2001:db8:77::/48");
+    expect(networkOf("2001:db8:77:1205::/64")).toBe("2001:db8:77:1200::/56");
+    expect(networkOf("2001:db8:77:5::/64")).toBe("2001:db8:77:0::/56");
+    expect(networkOf(addressKey("2001:db8:77:12ff:1::1")!)).not.toBe(networkOf(addressKey("2001:db8:77:1300::1")!));
     expect(networkOf("203.0.113.9")).toBe("203.0.113.0/24");
     expect(networkOf(SHARED_CLIENT)).toBe(SHARED_CLIENT);
   });
@@ -258,6 +260,33 @@ describe("LoginGate: a flood of wrong passwords from many addresses slows sign-i
     expect(await g.tryOnce("198.51.100.7", true)).toBe("right");
     expect(g.sleeps.length).toBe(before);
     expect(g.gate.count()).toBe(0);
+  });
+
+  it("the other residual, stated plainly: an address in a block that is flooding (same IPv4 /24 or IPv6 /56) waits behind that block and can be sent away", async () => {
+    const g = gateOnClock();
+    await flood(g, LOGIN_GLOBAL_FREE);
+    const turns = [g.tryOnce(addr(900))];
+    for (let i = 2; i < 2 + LOGIN_MAX_WAITING; i++) turns.push(g.tryOnce(`203.0.113.${i}`, false, "neighbour"));
+    expect(await g.tryOnce("203.0.113.200", true, "operator")).toBe("busy");
+    expect(g.gate.blocked("203.0.113.200")).toBe(false); // sent away from the line, not locked
+    await Promise.all(turns);
+  });
+
+  it("a request sent away for waiting too long had really waited that long, on the gate's clock", async () => {
+    const g = gateOnClock({ maxWaiting: 1_000 });
+    await flood(g, LOGIN_GLOBAL_FREE);
+    const turns = [g.tryOnce(addr(900))];
+    const t0 = g.clock.t;
+    let waited = -1;
+    const repeat = g.tryOnce(addr(1)).then((o) => {
+      waited = g.clock.t - t0;
+      return o;
+    });
+    for (let i = 0; i < 40; i++) turns.push(g.tryOnce(addr(3_000 + i)));
+    expect(await repeat).toBe("busy");
+    expect(waited).toBeGreaterThanOrEqual(LOGIN_MAX_WAIT_MS);
+    expect(waited).toBeLessThanOrEqual(LOGIN_MAX_WAIT_MS + 3 * LOGIN_SLOW_GAP_MS);
+    await Promise.all(turns);
   });
 
   it("the default clock cannot go backwards (it is not the wall clock)", async () => {

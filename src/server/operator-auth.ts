@@ -205,12 +205,15 @@ export function clientKey(req: Request, hops: number = trustedProxyHops()): stri
 }
 
 /**
- * The wider network an address sits in: IPv4 /24, IPv6 /48. Used only to decide who goes first while sign-in is
- * slowed (D-77), never to refuse anyone: one holder of a large block cannot pose as many unrelated newcomers.
+ * The wider network an address sits in: IPv4 /24, IPv6 /56. Used only to order the line while sign-in is slowed
+ * (D-77), never for the per-address limit: one holder of a block cannot pose as many unrelated newcomers.
  */
 export function networkOf(client: string): string {
   if (client === SHARED_CLIENT) return SHARED_CLIENT;
-  if (client.endsWith("::/64")) return `${client.split(":").slice(0, 3).join(":")}::/48`;
+  if (client.endsWith("::/64")) {
+    const g = client.split(":");
+    return `${g.slice(0, 3).join(":")}:${(parseInt(g[3]!, 16) & 0xff00).toString(16)}::/56`;
+  }
   return `${client.split(".").slice(0, 3).join(".")}.0/24`;
 }
 
@@ -263,7 +266,7 @@ type Pass = LoginPass & { free: boolean; used: boolean };
  *   all clients together) cost no wait. Past that, permissions are handed out one at a time, `slowGapMs` apart, to
  *   the waiting request whose network has the fewest wrong passwords counted (ties: first come). That bounds the
  *   total guessing rate whatever the number of addresses, and puts a newcomer ahead of everyone who has guessed.
- *   "Fewest" counts the network (IPv4 /24, IPv6 /48) and the requests from it already waiting, so one address or one
+ *   "Fewest" counts the network (IPv4 /24, IPv6 /56) and the requests from it already waiting, so one address or one
  *   block cannot fill the line. Only when more than `maxWaiting` requests wait, or one has waited `maxWaitMs`, is a
  *   waiting request told to come back (the one with the most behind it first); nothing is counted against it.
  *
@@ -429,10 +432,10 @@ export async function readSmallBody(req: Request, max: number = LOGIN_MAX_BODY_B
   const declared = req.headers.get("content-length");
   if (declared !== null && (!/^\d{1,15}$/.test(declared) || Number(declared) > max)) return null;
   if (!req.body) return new Uint8Array(new ArrayBuffer(0));
-  const reader = req.body.getReader();
   const chunks: Uint8Array[] = [];
   let size = 0;
   try {
+    const reader = req.body.getReader();
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
