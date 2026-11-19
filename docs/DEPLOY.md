@@ -185,7 +185,9 @@ Each of these is a "check it on the day" item, not a known problem.
 8. **`x-forwarded-proto` on Render.** The web-services page says Render terminates TLS and redirects HTTP to HTTPS; it
    does not name the header the app reads for the `Secure` cookie flag. Check the cookie at step 8.
 9. **Prices.** None read, none quoted.
-10. **`scripts/check-migrations.sh`** cannot run in the agent sandbox (D-26); CI decides it. No schema change here.
+10. **A scan inside the image.** CI proves Chromium launches in the image and the app answers; no full crawl has been
+    run in it. Step 7 is the first one. (`scripts/check-migrations.sh` cannot run in the agent sandbox, D-26, but CI
+    runs it and it passed on this branch; there is no schema change.)
 
 ## Before going public (any option)
 

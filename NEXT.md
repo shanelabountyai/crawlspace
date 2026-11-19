@@ -42,7 +42,8 @@ already fixed it (D-61; codes map to fixed sentences in `src/lib/report/words.ts
 Render to arbitrary hosts and ports (D-22; Render's docs only say port 25 is blocked); the image building and running
 on Render itself; who owns the disk mount; memory on any instance type; shared memory / init for Chromium on Render;
 the minimum disk size; Blueprint creation details (empty `sync: false` values, first deploy with auto-deploy off);
-the `x-forwarded-proto` header on Render; prices (none quoted); the migration drift check (CI only).
+the `x-forwarded-proto` header on Render; prices (none quoted); a full scan inside the image (CI only proves Chromium
+launches there).
 
 **Shane's hand steps, in order** (details in `docs/DEPLOY.md` "The owner's steps"):
 
