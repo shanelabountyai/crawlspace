@@ -20,7 +20,15 @@ CLI was touched, no environment variable or secret was set anywhere, and `render
   refuses pulls from Docker Hub and Prisma's engine download). The image is verified only by the new CI job. The
   entrypoint script itself was run here against the local build: port 10000 honoured, app as `node`, database created
   in a root-owned directory, health route and home page 200, health route did not create the database.
-- **CI on the PR:** see the PR description for the result of each check (`check`, `docker`).
+- **CI on the PR:** first push (1c6a0cf): `docker` failed at step 6 of the new smoke script (a wrong `docker top`
+  call in the script; the image had built, Chromium had launched and both pages had answered 200) and `check` failed
+  on one e2e, 15 of 16 passed (see the flake below). Second push (664a703): `check` success (e2e 16/16, migrations
+  match), `docker` success (all 7 smoke steps). The result for the final commit is in the PR description.
+- **Flake seen once, not fixed (D-74):** on 1c6a0cf `e2e/a11y.spec.ts:29` failed with axe `document-title (serious)`
+  on the report in light mode. The same test passed on main (eccd4c3), locally, and on the next push with no change to
+  the page or the test. It is design-pass code this run may not touch. If it comes back, look at the moment the
+  report page swaps from progress to report (`generateMetadata` in `src/app/scans/[id]/page.tsx`); that cause is a
+  guess, not a finding.
 
 **Operator sign-in caveat (carry this forward).** The Phase 4 review's operator-login should-fix items below
 ("Review run", items 1, 2 and 5: limiter checked before the body is read, one global lockout counter, session token
