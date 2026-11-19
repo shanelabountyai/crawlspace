@@ -66,10 +66,10 @@ code="$(curl -s -o /dev/null -w '%{http_code}' "$base/")"
 echo "   / -> 200"
 
 echo "6. The app runs as a non-root user"
-procs="$(docker top "$name" -eo uid,args | grep -E 'next' || true)"
+procs="$(docker top "$name" -eo pid,uid,args | grep -E 'next' || true)" # docker top needs the pid column
 echo "$procs"
 [ -n "$procs" ] || { echo "no next process found"; exit 1; }
-if echo "$procs" | awk '{ if ($1 == 0) found = 1 } END { exit found ? 0 : 1 }'; then echo "the app is running as root"; exit 1; fi
+if echo "$procs" | awk '{ if ($2 == 0) found = 1 } END { exit found ? 0 : 1 }'; then echo "the app is running as root"; exit 1; fi
 
 echo "7. The database lands on the mounted volume (a refused scan opens it; nothing is fetched)"
 code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: application/json' -d '{"url":"http://127.0.0.1/"}' "$base/api/scans")"
