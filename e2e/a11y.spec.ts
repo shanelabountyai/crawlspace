@@ -107,3 +107,25 @@ test("review fixes (D-60..D-63): the PDF field is a normal 48 px box inside its 
   await expect(input).toHaveAttribute("aria-invalid", "true");
   await expect(page.getByRole("button", { name: "Download PDF" })).toBeFocused();
 });
+
+test("the page always has a title while a scan result is on screen, including the moment progress turns into the report (D-75)", async ({ page }) => {
+  // Records every moment at which a finished or stopped scan is shown and the document has no <title>.
+  await page.addInitScript(() => {
+    const w = window as unknown as { __untitled: string[] };
+    w.__untitled = [];
+    const look = () => {
+      const status = document.querySelector('[data-testid="scan-status"]')?.getAttribute("data-status");
+      if ((status === "done" || status === "failed") && document.querySelectorAll("title").length === 0) w.__untitled.push(status);
+    };
+    new MutationObserver(look).observe(document, { subtree: true, childList: true, attributes: true });
+    const frame = () => {
+      look();
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  });
+  await scan(page, site("walledshop.test"), "done");
+  expect(await page.title()).toMatch(/^Report ready: walledshop\.test/);
+  await page.waitForTimeout(500); // longer than the gap that was seen (about 300 ms)
+  expect(await page.evaluate(() => (window as unknown as { __untitled: string[] }).__untitled)).toEqual([]);
+});
