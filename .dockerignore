@@ -1,0 +1,36 @@
+# Kept out of the Docker build context and so out of the image (D-66).
+# The build needs src/, scripts/, tests/, e2e/ (tsconfig includes every *.ts), prisma/, rules/ and fixtures/.
+
+# Version control and CI
+.git
+.github
+
+# Installed and built inside the image
+node_modules
+.next
+out
+build
+src/generated
+*.tsbuildinfo
+
+# Local data and secrets: never in an image
+data
+.env*
+*.db
+*.db-wal
+*.db-shm
+
+# Test output
+test-results
+playwright-report
+coverage
+
+# Docs and design files: not needed at build or run time
+docs
+*.md
+
+# Deploy files themselves
+Dockerfile
+.dockerignore
+render.yaml
+.DS_Store

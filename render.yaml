@@ -1,0 +1,48 @@
+# Render Blueprint for Crawlspace (docs/DEPLOY.md "Render"; D-08, D-65, D-70). NOT DEPLOYED: nothing has been created on
+# Render. No secret values live in this file. Field names were checked against
+# https://render.com/docs/blueprint-spec on 2026-11-19; anything not confirmed there is marked "not verified".
+services:
+  - type: web
+    name: crawlspace
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+
+    # plan: left out on purpose. The spec says a new web service then gets `0.5c-512mb`, and that an existing
+    # service keeps whatever instance type it has, so a choice made in the dashboard is not overwritten by this file.
+    # A persistent disk needs a paid instance type (https://render.com/docs/disks). Not verified: whether Chromium
+    # plus the app fit in that default's memory.
+    # region: left out; the spec's default is `oregon` and it cannot be changed after the service is created.
+
+    # Exactly one instance and no `scaling` block: the scan queue and the limiters live in the app's memory
+    # (D-29, D-38, D-39). Render also refuses to scale a service that has a disk.
+    numInstances: 1
+
+    # Deploys start only when the owner starts one. Other values in the spec: `commit` (Render's default: deploy on
+    # every push to the branch) and `checksPass` (deploy only after CI passes).
+    autoDeployTrigger: "off" # quoted: a bare off is a YAML boolean
+
+    # GET /api/health answers 200 {"status":"ok"} without touching the database (src/app/api/health/route.ts).
+    healthCheckPath: /api/health
+
+    # SQLite lives on the disk. Only files under mountPath survive deploys and restarts.
+    disk:
+      name: crawlspace-data
+      mountPath: /data
+      # Smallest size asked for; a disk can grow later but never shrink. Not verified: the minimum Render accepts
+      # (the spec's default is 10).
+      sizeGB: 1
+
+    envVars:
+      - key: DATABASE_FILE
+        value: /data/crawlspace.db
+      # Secrets: declared without values. Render asks for them when the Blueprint is first created; the owner types
+      # them in the dashboard. PORT is not set here: Render provides it (default 10000) and the container honours it.
+      # CRAWLSPACE_HUBSPOT_ENABLED is deliberately not declared, so HubSpot stays off (D-36).
+      - key: CRAWLSPACE_OPERATOR_PASSWORD # leave unset for now: see docs/DEPLOY.md "Operator sign-in caveat"
+        sync: false
+      - key: ANTHROPIC_API_KEY # optional: unset means the template fix list (D-25)
+        sync: false
+      - key: HUBSPOT_PORTAL_ID # used only if CRAWLSPACE_HUBSPOT_ENABLED=1 is added by hand later
+        sync: false
+      - key: HUBSPOT_FORM_GUID
+        sync: false

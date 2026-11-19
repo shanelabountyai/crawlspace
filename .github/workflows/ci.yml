@@ -39,3 +39,16 @@ jobs:
             playwright-report/
             test-results/
           retention-days: 7
+
+  # Gate for the Docker image (Dockerfile, render.yaml; D-71). Builds the image, starts the container the way Render
+  # does (PORT from the platform, DATABASE_FILE on a mounted volume), and fails unless the health route and the home
+  # page both answer 200. Deploys nothing and needs no secrets.
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the image
+        run: docker build -t crawlspace:ci .
+      - name: Start the container, wait for /api/health, request the home page
+        run: bash scripts/docker-smoke.sh crawlspace:ci
