@@ -424,6 +424,9 @@ export function loginGate(): LoginGate {
   return g[LIMITER_KEY];
 }
 
+/** Body cap for the public scan and PDF-gate posts: a URL (≤ 2,048 chars) or an email fits many times over (review 2026-11-20, SEC-5). */
+export const PUBLIC_MAX_BODY_BYTES = 8192;
+
 /**
  * Read at most `max` bytes of a request body. Null when it is longer (by its Content-Length, or by what arrives) or
  * cannot be read: nothing larger than a password form is ever buffered or hashed.

@@ -86,6 +86,55 @@ describe("PDF export (D-37)", () => {
     expect(lines.join("").replace(/\s/g, "")).toBe(`see${url}now`);
   });
 
+  it("wraps a very long unbroken token quickly (review 2026-11-20, CQ-4: was cubic, 8,000 chars took about a minute)", async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    const long = "W".repeat(8000);
+    const t0 = performance.now();
+    const lines = wrapText(`heading ${long} end`, font, 9, 300);
+    expect(performance.now() - t0).toBeLessThan(1000);
+    for (const l of lines) expect(font.widthOfTextAtSize(l, 9)).toBeLessThanOrEqual(300);
+    expect(lines.join("").replace(/\s/g, "")).toBe(`heading${long}end`);
+  });
+
+  it("cuts long tokens at exactly the same places as the original character-by-character loop (D-37 output unchanged)", async () => {
+    const doc = await PDFDocument.create();
+    const font = await doc.embedFont(StandardFonts.Helvetica);
+    // the pre-2026-11-20 algorithm, kept here as the reference
+    const reference = (text: string, size: number, width: number): string[] => {
+      const words = text.split(" ").filter((w) => w.length > 0);
+      const out: string[] = [];
+      let line = "";
+      const fits = (s: string) => font.widthOfTextAtSize(s, size) <= width;
+      for (let word of words) {
+        const candidate = line ? `${line} ${word}` : word;
+        if (fits(candidate)) {
+          line = candidate;
+          continue;
+        }
+        if (line) out.push(line);
+        line = "";
+        while (!fits(word)) {
+          let n = word.length - 1;
+          while (n > 1 && !fits(word.slice(0, n))) n--;
+          out.push(word.slice(0, n));
+          word = word.slice(n);
+        }
+        line = word;
+      }
+      if (line) out.push(line);
+      return out.length ? out : [""];
+    };
+    const samples = [
+      "see https://example.test/" + "a".repeat(300) + " now",
+      "Wi" + "lIW.-/".repeat(60) + " tail words here",
+      "short words only, nothing long at all in this sentence of evidence",
+      "x".repeat(5),
+      "",
+    ];
+    for (const s of samples) for (const [size, width] of [[10, 200], [8, 60], [9, 7]] as const) expect(wrapText(s, font, size, width)).toEqual(reference(s, size, width));
+  });
+
   it("names the file after the host and the scan day", () => {
     expect(pdfFileName("https://shop.example/products/1", "2026-11-18T10:00:00.000Z")).toBe("crawlspace-shop.example-2026-11-18.pdf");
     expect(pdfFileName("not a url", "?")).toBe("crawlspace-report-undated.pdf");
