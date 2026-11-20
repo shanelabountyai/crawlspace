@@ -1,5 +1,6 @@
 import { scanErrorCode } from "@/lib/report/words";
 import { getScanService } from "@/server/scan-service";
+import { PUBLIC_MAX_BODY_BYTES, readSmallBody } from "@/server/operator-auth";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +13,11 @@ export async function POST(req: Request): Promise<Response> {
   const isJson = (req.headers.get("content-type") ?? "").includes("application/json");
   let url: unknown;
   try {
-    url = isJson ? ((await req.json()) as { url?: unknown } | null)?.url : (await req.formData()).get("url");
+    // At most PUBLIC_MAX_BODY_BYTES is read; a larger body is refused unparsed (review 2026-11-20, SEC-5)
+    const bytes = await readSmallBody(req, PUBLIC_MAX_BODY_BYTES);
+    if (!bytes) throw new Error("body too large or unreadable");
+    const body = new Response(bytes, { headers: { "content-type": req.headers.get("content-type") ?? "" } });
+    url = isJson ? ((await body.json()) as { url?: unknown } | null)?.url : (await body.formData()).get("url");
   } catch {
     return Response.json({ error: "could not read the request" }, { status: 400 });
   }

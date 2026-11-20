@@ -45,8 +45,15 @@ export class ScanService {
       throw e;
     }
     if (this.pending >= (this.deps.queueLimit ?? QUEUE_LIMIT)) return { ok: false, status: 429, error: "the scanner is busy; try again in a minute" };
-    const id = await this.store.create(url);
+    // Take the slot before the first await, so submits that arrive together cannot all pass the check (review 2026-11-20, CQ-1)
     this.pending++;
+    let id: string;
+    try {
+      id = await this.store.create(url);
+    } catch (e) {
+      this.pending--;
+      throw e;
+    }
     this.chain = this.chain.then(() => this.run(id, url)).finally(() => {
       this.pending--;
     });
@@ -89,7 +96,10 @@ export function getScanService(): Promise<ScanService> {
     const store = new ScanStore(getDb());
     await store.failInterrupted();
     return new ScanService(store, resolveDeps());
-  })();
+  })().catch((e: unknown) => {
+    delete g[KEY]; // retry on the next request instead of failing until a restart (review 2026-11-20, CQ-6)
+    throw e;
+  });
   return g[KEY];
 }
 
@@ -102,6 +112,9 @@ export function getLeadService(): Promise<LeadService> {
   g[LEADS_KEY] ??= (async () => {
     const svc = await getScanService();
     return new LeadService(svc.store, new LeadStore(getDb()), hubspotFromEnv());
-  })();
+  })().catch((e: unknown) => {
+    delete g[LEADS_KEY]; // same as getScanService (CQ-6)
+    throw e;
+  });
   return g[LEADS_KEY];
 }
