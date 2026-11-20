@@ -1,5 +1,14 @@
 # Crawlspace — next
 
+## WebRTC guard (2026-11-20, branch `fix/webrtc-guard`)
+
+Review rank 2 (SEC-1) from PR #11's `docs/REVIEW-2026-11-20.md`: a scanned page's JavaScript could send UDP to
+loopback and private addresses through WebRTC. Fixed in `src/lib/crawl/render.ts` with Chromium flags that allow only
+proxied UDP (the proxy is dead) and an init script that removes the WebRTC constructors (D-100). Test
+`tests/invariants/cs03-webrtc.test.ts` failed first (2 packets reached a loopback STUN listener), passes after. Gate:
+lint, typecheck, `npm test` 406/406, build, e2e 18/18, all exit 0. Not verified on Render. You: review the draft PR,
+merge after CI, deploy with PR #11.
+
 ## Operator-login fixes (scheduled run, 2026-11-19, branch `fix/operator-login`)
 
 One draft PR ("Crawlspace: operator-login fixes (limiter race, lockout, session token)"), not merged. **Nothing was

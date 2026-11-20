@@ -45,10 +45,30 @@ export class PlaywrightRenderer implements Renderer {
     if (this.context) return this.context;
     const { chromium } = await import("playwright");
     this.browser = await chromium.launch({
-      args: ["--host-resolver-rules=MAP * ~NOTFOUND", "--proxy-bypass-list=<-loopback>", "--disable-background-networking", "--disable-component-update", "--no-pings"],
+      args: [
+        "--host-resolver-rules=MAP * ~NOTFOUND",
+        "--proxy-bypass-list=<-loopback>",
+        "--disable-background-networking",
+        "--disable-component-update",
+        "--no-pings",
+        // WebRTC sends UDP by IP literal, past request interception, DNS and the proxy: allow only proxied UDP,
+        // and the proxy is dead (review 2026-11-20, SEC-1; D-100)
+        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+        "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+      ],
       proxy: { server: "http://127.0.0.1:9" },
     });
     this.context = await this.browser.newContext({ userAgent: USER_AGENT, serviceWorkers: "block", acceptDownloads: false, javaScriptEnabled: true });
+    // And page scripts never get WebRTC at all, in every frame (D-100). Removed before any page script runs.
+    await this.context.addInitScript(() => {
+      for (const name of ["RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel", "RTCIceCandidate", "RTCSessionDescription", "RTCRtpSender", "RTCRtpReceiver", "RTCRtpTransceiver", "RTCDtlsTransport", "RTCIceTransport", "RTCSctpTransport", "RTCCertificate"]) {
+        try {
+          delete (globalThis as Record<string, unknown>)[name];
+        } catch {
+          // a non-configurable global stays; the launch flags above still block its UDP
+        }
+      }
+    });
     await this.context.routeWebSocket(/.*/, (ws) => {
       this.events.push({ page: "", url: ws.url(), method: "GET", resourceType: "websocket", action: "blocked", reason: "websockets are never opened" });
       void ws.close();
