@@ -26,6 +26,22 @@ export class NoRenderer implements Renderer {
   async close(): Promise<void> {}
 }
 
+/** How the rendering browser is launched (D-20, D-100). Exported so tests can check each guard layer on its own. */
+export const CHROMIUM_LAUNCH = {
+  args: [
+    "--host-resolver-rules=MAP * ~NOTFOUND",
+    "--proxy-bypass-list=<-loopback>",
+    "--disable-background-networking",
+    "--disable-component-update",
+    "--no-pings",
+    // WebRTC sends UDP by IP literal, past request interception, DNS and the proxy: allow only proxied UDP,
+    // and the proxy is dead (review 2026-11-20, SEC-1; D-100)
+    "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+    "--webrtc-ip-handling-policy=disable_non_proxied_udp",
+  ],
+  proxy: { server: "http://127.0.0.1:9" },
+};
+
 const ASSET_TYPES = new Set(["script", "xhr", "fetch"]);
 
 /**
@@ -44,20 +60,7 @@ export class PlaywrightRenderer implements Renderer {
   private async ctx(): Promise<BrowserContext> {
     if (this.context) return this.context;
     const { chromium } = await import("playwright");
-    this.browser = await chromium.launch({
-      args: [
-        "--host-resolver-rules=MAP * ~NOTFOUND",
-        "--proxy-bypass-list=<-loopback>",
-        "--disable-background-networking",
-        "--disable-component-update",
-        "--no-pings",
-        // WebRTC sends UDP by IP literal, past request interception, DNS and the proxy: allow only proxied UDP,
-        // and the proxy is dead (review 2026-11-20, SEC-1; D-100)
-        "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
-        "--webrtc-ip-handling-policy=disable_non_proxied_udp",
-      ],
-      proxy: { server: "http://127.0.0.1:9" },
-    });
+    this.browser = await chromium.launch({ args: [...CHROMIUM_LAUNCH.args], proxy: { ...CHROMIUM_LAUNCH.proxy } });
     this.context = await this.browser.newContext({ userAgent: USER_AGENT, serviceWorkers: "block", acceptDownloads: false, javaScriptEnabled: true });
     // And page scripts never get WebRTC at all, in every frame (D-100). Removed before any page script runs.
     await this.context.addInitScript(() => {
