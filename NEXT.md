@@ -1,5 +1,20 @@
 # Crawlspace — next
 
+## Backlog from the 2026-11-20 review (approved 2026-11-20, D-101)
+
+In order. Each PRD is in `docs/prds/` (index: `docs/prds/README.md`), status Proposed; none is started.
+
+1. You: rank 1, the live smoke test (scan a site you own that needs JavaScript, PDF, restart, reopen).
+2. You: Decision 6a, set `CRAWLSPACE_TRUSTED_PROXY_HOPS` (`docs/DEPLOY.md`); PRD-03 depends on it.
+3. Rank 9 (Decision 4b): move the PDF panel to just after "Fix these first" (no new copy; small).
+4. PRD-01 Headless browser isolation (SEC-2; SEC-1 is done in PR #12).
+5. PRD-02 Crawl correctness and politeness (needs your OK on scoring-adjacent behaviour).
+6. PRD-03 Abuse limits, capacity and retention (limit numbers are yours).
+7. PRD-04 Report and fix-list copy (wording is yours).
+8. PRD-05 Visual and accessibility polish.
+9. PRD-06 Demo script and dogfood assets.
+10. Chores: SEC-7 (`prisma` CLI to devDependencies), CQ-11, NEXT item 7b.
+
 ## Closeout follow-up: five-lens review and must-fix fixes (scheduled run, 2026-11-20, branch `closeout/2026-11-19`)
 
 One draft PR ("Crawlspace: closeout pack + five-lens review (docs)"), not merged. **Nothing was deployed**; no hosting
