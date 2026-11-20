@@ -1,5 +1,16 @@
 # Crawlspace — next
 
+## WebRTC guard (2026-11-20, branch `fix/webrtc-guard`)
+
+Review rank 2 (SEC-1) from PR #11's `docs/REVIEW-2026-11-20.md`: a scanned page's JavaScript could send UDP to
+loopback and private addresses through WebRTC. Fixed in `src/lib/crawl/render.ts` with Chromium flags that allow only
+proxied UDP (the proxy is dead) and an init script that removes the WebRTC constructors (D-100). Test
+`tests/invariants/cs03-webrtc.test.ts` failed first (2 packets reached a loopback STUN listener), passes after. Gate:
+lint, typecheck, `npm test` 406/406, build, e2e 18/18, all exit 0. Follow-up commit: a second test checks the launch flags
+alone, without the init script (56 packets without the flags, 0 with); gate after merging main: lint, typecheck, build exit 0, `npm test` 414/414 in
+28 files, e2e 21/21. Not verified on Render. You: review the draft PR,
+merge after CI, deploy with the review fixes (PR #11).
+
 ## Backlog from the 2026-11-20 review (approved 2026-11-20, D-101)
 
 In order. Each PRD is in `docs/prds/` (index: `docs/prds/README.md`), status Proposed; none is started.
