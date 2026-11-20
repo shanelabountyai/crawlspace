@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createSocket } from "node:dgram";
 import { crawlSite, Fetcher, SsrfError } from "@/lib/crawl";
 import { SiteServer, testGuard, testPolicy } from "../helpers/site-server";
 
@@ -81,5 +82,43 @@ document.body.insertAdjacentHTML("beforeend", "<p id=ran>js ran</p>");
     expect(snapshot.pages[0]!.renderedHtml).toContain("js ran");
     expect(srv.hits.filter((h) => internal.includes(h.path))).toEqual([]);
     expect(report.renderEvents.some((e) => e.url.includes("/xhr") && e.action !== "fulfilled")).toBe(true);
+  }, 60_000);
+
+  // Review 2026-11-20 SEC-1: WebRTC sends UDP (STUN) itself, outside request interception and the dead proxy.
+  it("the rendering browser sends no WebRTC/STUN packets to private addresses", async () => {
+    const udp = createSocket("udp4");
+    const packets: number[] = [];
+    udp.on("message", (m) => packets.push(m.length));
+    await new Promise<void>((resolve) => udp.bind(0, "127.0.0.1", resolve));
+    const u = udp.address().port;
+    const page = `<!doctype html><html><head><title>t</title></head><body><h1>Hello</h1>
+<script>
+try {
+  const pc = new RTCPeerConnection({ iceServers: [{ urls: "stun:127.0.0.1:${u}" }, { urls: "turn:127.0.0.1:${u}?transport=udp", username: "u", credential: "c" }] });
+  pc.createDataChannel("x");
+  pc.createOffer().then((o) => pc.setLocalDescription(o)).catch(() => {});
+  // Second path: a peer-to-peer connectivity check aimed at a candidate the page made up.
+  const a = new RTCPeerConnection(), b = new RTCPeerConnection();
+  a.createDataChannel("y");
+  a.createOffer().then(async (o) => {
+    await a.setLocalDescription(o);
+    await b.setRemoteDescription(o);
+    const ans = await b.createAnswer();
+    await b.setLocalDescription(ans);
+    await a.setRemoteDescription(ans);
+    await a.addIceCandidate({ candidate: "candidate:1 1 udp 2122260223 127.0.0.1 ${u} typ host", sdpMid: "0", sdpMLineIndex: 0 });
+  }).catch(() => {});
+} catch (e) {}
+document.body.insertAdjacentHTML("beforeend", "<p id=ran>js ran</p>");
+</script></body></html>`;
+    const base = srv.site("rtc.test", { "/": { body: page } });
+    try {
+      const { snapshot } = await crawlSite(`${base}/`, { guard: testGuard });
+      expect(snapshot.pages[0]!.renderedHtml).toContain("js ran");
+      await new Promise((r) => setTimeout(r, 1_000));
+      expect(packets, "UDP packets that reached 127.0.0.1").toEqual([]);
+    } finally {
+      udp.close();
+    }
   }, 60_000);
 });

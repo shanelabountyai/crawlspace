@@ -33,6 +33,7 @@ const ASSET_TYPES = new Set(["script", "xhr", "fetch"]);
  * the page's own document is served from the bytes the fetcher already downloaded, scripts/XHR go through the
  * same guarded GET-only fetcher (rate limit, SSRF guard, budget), everything else is aborted. As a second line,
  * Chromium's DNS is disabled and it is pointed at a dead proxy, so anything that slips past interception fails.
+ * WebRTC opens its own UDP sockets, outside both, so it is limited to proxied traffic only (D-100).
  */
 export class PlaywrightRenderer implements Renderer {
   readonly events: RenderEvent[] = [];
@@ -45,7 +46,7 @@ export class PlaywrightRenderer implements Renderer {
     if (this.context) return this.context;
     const { chromium } = await import("playwright");
     this.browser = await chromium.launch({
-      args: ["--host-resolver-rules=MAP * ~NOTFOUND", "--proxy-bypass-list=<-loopback>", "--disable-background-networking", "--disable-component-update", "--no-pings"],
+      args: ["--host-resolver-rules=MAP * ~NOTFOUND", "--proxy-bypass-list=<-loopback>", "--disable-background-networking", "--disable-component-update", "--no-pings", "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"],
       proxy: { server: "http://127.0.0.1:9" },
     });
     this.context = await this.browser.newContext({ userAgent: USER_AGENT, serviceWorkers: "block", acceptDownloads: false, javaScriptEnabled: true });

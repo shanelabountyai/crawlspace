@@ -1,5 +1,22 @@
 # Crawlspace — next
 
+## WebRTC guard (2026-11-20, branch `fix/webrtc-guard`)
+
+One draft PR, not merged, nothing deployed. Fixes rank 2 of `docs/REVIEW-2026-11-20.md` (SEC-1, on PR #11's branch):
+page JavaScript in the rendering browser could send UDP packets to private addresses with WebRTC, around the
+request interception and the dead proxy of D-20.
+
+- **Fix (D-100):** one launch flag in `src/lib/crawl/render.ts`, `--force-webrtc-ip-handling-policy=disable_non_proxied_udp`.
+- **Test, written first:** `tests/invariants/cs03-ssrf.test.ts` "sends no WebRTC/STUN packets". Before the flag:
+  14 UDP packets reached 127.0.0.1; after: 0 in 4 runs.
+- **Gate (local sandbox, Node 22.23.5):** `npm ci` exit 0 with the Prisma engine stub (D-99); lint, typecheck and
+  build exit 0; `npm test` 406/406 in 26 files (main had 405); `npm run e2e` 18/18. `scripts/check-migrations.sh` and
+  the Docker image cannot run here (D-26, D-71): CI decides them.
+- **Not changed:** scoring, checks, D-34 bands, the SSRF guard's code, the schema. No test deleted, skipped or weakened.
+- **Not verified:** that Render's Chromium build honours the flag (the CI `docker` job uses the same image recipe).
+- **You:** merge PR #11 and this one in either order; if `docs/DECISIONS.md` conflicts at the end, keep both sets of
+  rows. Then deploy and run the live smoke test (review rank 1).
+
 ## Operator-login fixes (scheduled run, 2026-11-19, branch `fix/operator-login`)
 
 One draft PR ("Crawlspace: operator-login fixes (limiter race, lockout, session token)"), not merged. **Nothing was
