@@ -7,9 +7,60 @@ loopback and private addresses through WebRTC. Fixed in `src/lib/crawl/render.ts
 proxied UDP (the proxy is dead) and an init script that removes the WebRTC constructors (D-100). Test
 `tests/invariants/cs03-webrtc.test.ts` failed first (2 packets reached a loopback STUN listener), passes after. Gate:
 lint, typecheck, `npm test` 406/406, build, e2e 18/18, all exit 0. Follow-up commit: a second test checks the launch flags
-alone, without the init script (56 packets without the flags, 0 with); gate after it: lint, typecheck, build exit 0,
-`npm test` 407/407 in 27 files, e2e 18/18. Not verified on Render. You: review the draft PR,
-merge after CI, deploy with PR #11.
+alone, without the init script (56 packets without the flags, 0 with). Not verified on Render. You: review the draft PR,
+merge after CI, deploy with the review fixes (PR #11).
+
+## Backlog from the 2026-11-20 review (approved 2026-11-20, D-101)
+
+In order. Each PRD is in `docs/prds/` (index: `docs/prds/README.md`), status Proposed; none is started.
+
+1. You: rank 1, the live smoke test (scan a site you own that needs JavaScript, PDF, restart, reopen).
+2. You: Decision 6a, set `CRAWLSPACE_TRUSTED_PROXY_HOPS` (`docs/DEPLOY.md`); PRD-03 depends on it.
+3. Rank 9 (Decision 4b): move the PDF panel to just after "Fix these first" (no new copy; small).
+4. PRD-01 Headless browser isolation (SEC-2; SEC-1 is done in PR #12).
+5. PRD-02 Crawl correctness and politeness (needs your OK on scoring-adjacent behaviour).
+6. PRD-03 Abuse limits, capacity and retention (limit numbers are yours).
+7. PRD-04 Report and fix-list copy (wording is yours).
+8. PRD-05 Visual and accessibility polish.
+9. PRD-06 Demo script and dogfood assets.
+10. Chores: SEC-7 (`prisma` CLI to devDependencies), CQ-11, NEXT item 7b.
+
+## Closeout follow-up: five-lens review and must-fix fixes (scheduled run, 2026-11-20, branch `closeout/2026-11-19`)
+
+One draft PR ("Crawlspace: closeout pack + five-lens review (docs)"), not merged. **Nothing was deployed**; no hosting
+account, environment variable or secret was touched. Last night's run wrote the closeout docs (D-82..D-87) and stopped
+on its usage limit before the review; this run did the review and the PR.
+
+- **Review:** five lenses (UX/demo, design, accessibility, security, code/tests) by agents that had not seen the
+  closeout work, then a product-owner agent ranked everything: `docs/REVIEW-2026-11-20.md`. 48 findings (0 Blocker,
+  15 Major, 33 Minor) → 34 work items: **13 must-fix, 12 should-fix, 9 later**. No PRDs written (they need your OK).
+- **Fixed here (7 must-fix, each with a test that failed first):** scan queue race (D-92), cubic PDF line wrapping
+  (D-93), start-up failure cached until restart (D-94), unbounded POST bodies (D-95), security headers without a
+  script CSP (D-96), evidence glued to its URL and the "Every check" scroll box unreachable by keyboard at 200% zoom
+  (D-97). Links to the missing review file in `docs/DEMO.md` and `docs/RELEASE_NOTES.md` now point at the review (D-98).
+- **Not changed:** scoring, checks, D-34 bands, SSRF guard, crawler, schema. No test deleted, skipped or weakened.
+- **Local gate (D-99):** `npm ci` (Prisma schema engine stubbed, D-26), lint, typecheck, `npm test` 412/412 (27 files;
+  was 405 in 26), build, e2e 21/21 (was 18): all exit 0. The same gate on the branch before the fixes: all exit 0,
+  405/405 and 18/18, so nothing was already failing. `scripts/check-migrations.sh` and the Docker image cannot run
+  here (D-26, D-71); CI decides them.
+- **Not verified:** anything on the live site beyond read-only GETs (no scan, PDF or operator flow; no live headers);
+  which commit Render serves; Chromium on Render; the exec brief's contents (D-98); real fonts, Safari, a screen reader.
+- **Still open, highest first:** rank 2 (WebRTC can reach private addresses from the scanner's browser; crawler code,
+  so not done here), ranks 7-9 (copy), rank 10 restructure, then the should-fix list in the review.
+
+**Your hand steps, in order:**
+
+1. You: review the draft PR; merge it once both CI jobs are green. Claude does not merge.
+2. You: deploy that commit on Render, then run one full scan of a site you own that needs JavaScript on
+   https://crawlspace.onrender.com, download its PDF, restart the service and reopen the report (review rank 1).
+   Check that B and E results look rendered.
+3. You: check `curl -sI https://crawlspace.onrender.com/` shows the new headers and no `X-Powered-By`.
+4. You: answer the 11 decisions in `docs/REVIEW-2026-11-20.md`, at least 2, 3, 4 and 8 before the demo or the post;
+   then ask for the rank 2 fix as its own small run, and for the PRDs.
+5. You: open the exec brief (https://claude.ai/artifact/FDRk4Cu9K2U8o6usqr3iKH) and check its verdict matches the
+   review (D-98).
+6. You: still open from the closeout: click through `docs/DEMO.md` and change its marks (D-87); edit the LinkedIn drafts;
+   read the Render bill into `docs/RELEASE_NOTES.md` (D-85); the `CRAWLSPACE_TRUSTED_PROXY_HOPS` step (`docs/DEPLOY.md`).
 
 ## Operator-login fixes (scheduled run, 2026-11-19, branch `fix/operator-login`)
 

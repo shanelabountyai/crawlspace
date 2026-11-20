@@ -82,8 +82,16 @@ export function wrapText(text: string, font: PDFFont, size: number, width: numbe
     if (line) lines.push(line);
     line = "";
     while (!fits(word)) {
-      let n = word.length - 1;
-      while (n > 1 && !fits(word.slice(0, n))) n--;
+      // Longest prefix (at least 1 char) that fits, by binary search: widths only grow with length, so this cuts at the
+      // same place as the old one-character-at-a-time loop without its cubic cost (review 2026-11-20, CQ-4).
+      let lo = 1;
+      let hi = word.length - 1;
+      while (lo < hi) {
+        const mid = Math.ceil((lo + hi) / 2);
+        if (fits(word.slice(0, mid))) lo = mid;
+        else hi = mid - 1;
+      }
+      const n = Math.max(1, lo);
       lines.push(word.slice(0, n));
       word = word.slice(n);
     }
