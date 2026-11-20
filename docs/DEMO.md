@@ -12,7 +12,8 @@ Each stop carries one of three marks:
   phone, or needs an inbox). Nobody has done it in a recorded run.
 
 Evidence for the live marks is the table in `docs/RELEASE_NOTES.md` "Live verification". Evidence for the local marks
-is the gate in the same file (e2e 18/18) and the screenshot pass described in `docs/reviews/FIVE-LENS-2026-11-19.md`.
+is the gate in the same file (e2e 18/18; 21/21 after the 2026-11-20 review fixes) and the local screenshot pass of the
+2026-11-20 review run, described in `docs/REVIEW-2026-11-20.md` "How the product was seen".
 
 ## Before the demo (You: do these once, the day before)
 
@@ -42,7 +43,7 @@ is the gate in the same file (e2e 18/18) and the screenshot pass described in `d
 | 12 | Health check `/api/health` | `{"status":"ok"}` | This is what Render polls. | **verified live (GET)**: 200, body `{"status":"ok"}` |
 | 13 | Phone width | The same pages at phone width. | Nothing scrolls sideways; wide tables scroll inside their own box. | **verified locally** at 390 px in light and dark (page width measured equal to the viewport on every screen captured). On a real phone: **not yet clicked through by the owner** |
 | 14 | Dark mode | Switch the device to dark. | Tokens exist for both schemes (D-48). | **verified locally** (axe: 0 violations on every screen in light and dark, e2e run of this session). Live: **not yet clicked through by the owner** |
-| 15 | The repo | `docs/DECISIONS.md`, `tests/invariants/`, `docs/reviews/FIVE-LENS-2026-11-19.md`. | Every judgment call is a numbered decision; five rules are tests that cannot be skipped (CS-01 to CS-05); the review lists what is still wrong. | Files read in this run |
+| 15 | The repo | `docs/DECISIONS.md`, `tests/invariants/`, `docs/REVIEW-2026-11-20.md`. | Every judgment call is a numbered decision; five rules are tests that cannot be skipped (CS-01 to CS-05); the review lists what is still wrong. | Files read in this run |
 
 ## What to know before showing it
 
@@ -51,8 +52,9 @@ is the gate in the same file (e2e 18/18) and the screenshot pass described in `d
   includes the last merges (PR #8, PR #10).
 - **The live site's wording quoted above was read through a fetch tool that converts pages to text.** The footer did
   not appear in that text, so the footer on the live site is not verified.
-- **Read the review first.** `docs/reviews/FIVE-LENS-2026-11-19.md` ranks what a hiring manager would hit in ten
-  minutes. Anything marked "Do now" there is worth fixing or knowing about before a demo.
+- **Read the review first.** `docs/REVIEW-2026-11-20.md` ranks what a hiring manager would hit in ten minutes.
+  Anything marked "Must-fix" and still open there is worth fixing or knowing about before a demo. The review also
+  proposes a shorter demo (about 6 stops, Decision 8); this walk-through was left as written for you to decide.
 
 ## Offline fallback
 

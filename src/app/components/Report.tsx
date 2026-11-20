@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import { CATEGORIES, type Category } from "@/lib/checks/types";
 import { formatScore, letterFor } from "@/lib/report/grade";
 import { FIX_SOURCE_TEXT } from "@/lib/report/words";
@@ -150,10 +151,11 @@ export function Report({ report, scannedAt }: { report: ReportView; scannedAt: s
                       {f.evidenceUrls.length ? (
                         <>
                           Evidence:{" "}
-                          {f.evidenceUrls.map((u) => (
-                            <code key={u} className="code-chip">
-                              {u}
-                            </code>
+                          {f.evidenceUrls.map((u, i) => (
+                            <Fragment key={u}>
+                              {i > 0 ? " " : null}
+                              <code className="code-chip">{u}</code>
+                            </Fragment>
                           ))}{" "}
                           ·{" "}
                         </>
@@ -172,7 +174,8 @@ export function Report({ report, scannedAt }: { report: ReportView; scannedAt: s
         <h2 id="checks-h" className="section-title">
           Every check
         </h2>
-        <div className="table-wrap">
+        {/* keyboard-reachable scroll box: it scrolls sideways at 641-769 px, e.g. 200% zoom (review 2026-11-20, A11Y-1) */}
+        <div className="table-wrap" tabIndex={0} role="group" aria-labelledby="checks-h">
           <table className="data checks" data-testid="checks">
             <thead>
               <tr>
@@ -205,8 +208,9 @@ export function Report({ report, scannedAt }: { report: ReportView; scannedAt: s
                         {c.evidence.map((e, i) => (
                           <li key={i}>
                             {e.detail}
-                            {e.url ? <code>{e.url}</code> : null}
-                            {e.selector ? <code>{e.selector}</code> : null}
+                            {/* a real space before each code, not only CSS margin (review 2026-11-20, DS-2 / A11Y-2) */}
+                            {e.url ? <> <code>{e.url}</code></> : null}
+                            {e.selector ? <> <code>{e.selector}</code></> : null}
                             {e.line ? <span className="meta"> line {e.line}</span> : null}
                           </li>
                         ))}

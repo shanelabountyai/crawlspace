@@ -13,7 +13,7 @@ is the first closeout for this repo; there is no earlier one. Written by the sch
 | Exec brief (non-technical) | https://claude.ai/artifact/FDRk4Cu9K2U8o6usqr3iKH (private Claude Docs document, "Crawlspace: exec brief (2026-11-19 launch)") |
 | Demo walk-through | `docs/DEMO.md` |
 | LinkedIn drafts (two) | `docs/LINKEDIN_DRAFTS.md`. Not posted, not added to the Lab Intelligence Ledger: that is an owner step |
-| Five-lens review | `docs/reviews/FIVE-LENS-2026-11-19.md` |
+| Five-lens review | `docs/REVIEW-2026-11-20.md` (run 2026-11-20; the 2026-11-19 run stopped on its usage limit before the review, D-98) |
 | Cost review | below, and D-85 |
 | Hand-off and owner steps | `NEXT.md`, top section |
 
