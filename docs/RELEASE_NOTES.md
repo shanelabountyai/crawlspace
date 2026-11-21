@@ -42,11 +42,14 @@ started, no sign-in attempted.
 | `/api/operator/client-address` | 404 while the operator page is off (D-39) | **Client error (4xx).** Exact code and body not shown |
 | `/robots.txt` | not known (the app defines none) | **Client error (4xx).** The live site serves no robots.txt |
 
+**Owner smoke test on the live site, 2026-11-20 (reported by Shane; not re-run by Claude):** passed. A full scan of
+labintelligence.co, the report, the PDF download, the report still there after a restart (`docs/DEPLOY.md` step 7),
+and the security headers live. Which commit Render was serving was not recorded.
+
 Not verified on the live site, and why:
 
-- A full scan, the report, the email gate and the PDF: each needs a POST, and this run was read-only on the live
-  site. All four were exercised locally (gate below).
-- The report surviving a restart (`docs/DEPLOY.md` step 7): needs the Render dashboard.
+- The email gate on its own (the field's refusals and errors): not part of the smoke test as reported. All of it was
+  exercised locally (gate below).
 - The footer text: it did not appear in the fetch tool's text version of the pages.
 - The exact status codes of the refused routes: the tool does not show them.
 - A phone, an in-app browser, a PDF opened from an inbox: owner steps.

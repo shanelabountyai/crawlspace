@@ -54,7 +54,9 @@ merge after CI, deploy with the review fixes (PR #11).
 
 In order. Each PRD is in `docs/prds/` (index: `docs/prds/README.md`), status Proposed; none is started.
 
-1. You: rank 1, the live smoke test (scan a site you own that needs JavaScript, PDF, restart, reopen).
+1. ~~You: rank 1, the live smoke test (scan a site you own that needs JavaScript, PDF, restart, reopen).~~ Done by you
+   on 2026-11-20: full scan of labintelligence.co, PDF download, report survives a restart, security headers live
+   (recorded in `docs/RELEASE_NOTES.md`).
 2. You: Decision 6a, set `CRAWLSPACE_TRUSTED_PROXY_HOPS` (`docs/DEPLOY.md`); PRD-03 depends on it.
 3. Rank 9 (Decision 4b): move the PDF panel to just after "Fix these first" (no new copy; small).
 4. PRD-01 Headless browser isolation (SEC-2; SEC-1 is done in PR #12).
