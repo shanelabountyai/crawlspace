@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import { CATEGORIES, type Category } from "@/lib/checks/types";
 import { formatScore, letterFor } from "@/lib/report/grade";
 import { FIX_SOURCE_TEXT } from "@/lib/report/words";
@@ -15,8 +15,12 @@ function Sparkle() {
   );
 }
 
-/** The report (Main.dc.html desktop, Phone.dc.html at 390 px). Every value comes from the stored scan. */
-export function Report({ report, scannedAt }: { report: ReportView; scannedAt: string | null }) {
+/**
+ * The report (Main.dc.html desktop, Phone.dc.html at 390 px). Every value comes from the stored scan.
+ * `afterFixes` is placed right after "Fix these first": the scan page puts the PDF panel there (review 2026-11-20
+ * rank 9, Decision 4b, D-102).
+ */
+export function Report({ report, scannedAt, afterFixes }: { report: ReportView; scannedAt: string | null; afterFixes?: ReactNode }) {
   const { scorecard: card, fixList, crawl } = report;
   const counts = { pass: 0, partial: 0, fail: 0, "not-applicable": 0 };
   for (const c of card.checks) counts[c.status]++;
@@ -169,6 +173,8 @@ export function Report({ report, scannedAt }: { report: ReportView; scannedAt: s
           </>
         )}
       </section>
+
+      {afterFixes}
 
       <section aria-labelledby="checks-h" className="stack">
         <h2 id="checks-h" className="section-title">

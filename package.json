@@ -19,6 +19,7 @@
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "e2e": "playwright test",
+    "e2e:base-path": "playwright test -c playwright.base-path.config.ts",
     "demo": "next build && tsx scripts/e2e-server.ts"
   },
   "dependencies": {

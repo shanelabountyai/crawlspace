@@ -1,9 +1,10 @@
 import { checkPassword, clientKey, isSecure, issueToken, loginGate, operatorConfig, readSmallBody, sameOrigin, sessionCookie } from "@/server/operator-auth";
+import { withBasePath } from "@/lib/base-path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const back = (query = "") => ({ status: 303, headers: { location: `/operator${query}` } });
+const back = (query = "") => ({ status: 303, headers: { location: withBasePath(`/operator${query}`) } });
 
 /** Password form → session cookie (D-39). Form posts get redirects; JSON callers get status codes. */
 export async function POST(req: Request): Promise<Response> {

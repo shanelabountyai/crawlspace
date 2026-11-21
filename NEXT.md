@@ -1,5 +1,44 @@
 # Crawlspace — next
 
+## PDF panel move + opt-in base path for assess hosting (scheduled run, 2026-11-21, branch `leadmagnet/2026-11-21`)
+
+One draft PR ("Crawlspace: PDF panel after "Fix these first" + opt-in base path for assess hosting"), not merged.
+**Nothing was deployed**; no Render, Cloudflare, Vercel or HubSpot setting, environment variable or secret was touched.
+Main was at ad0e62a (not moved). PR #14 untouched.
+
+- **Rank 9, Decision 4b (D-102):** the PDF panel now sits just after "Fix these first". No new copy, same gate.
+  `e2e/pdf-panel-position.spec.ts` failed on main, passes. You asked on Nov 20 for the box "above the report"; 4b is
+  the approved placement. Higher is your call. The panel still says "The report above is free either way" (PRD-04).
+- **Base path (D-103, D-104):** build-time `CRAWLSPACE_BASE_PATH` (e.g. `/agent-check`) → Next `basePath`; validated,
+  a bad value fails the build. Unset = served at the root as before. One helper (`src/lib/base-path.ts`) for every URL
+  Next does not prefix (fetch, form actions, operator export links, API redirects, the operator cookie path, the
+  HubSpot `pageUri`). `Dockerfile` build ARG; `render.yaml` commented-out option. One test changed, stricter:
+  `single-path.test.ts` now requires browser fetches to go through `withBasePath("/api/…")`.
+- **Proxy template (D-106):** `deploy/cloudflare-worker/` (Worker, `wrangler.toml.example`, README with your steps);
+  `docs/DEPLOY.md` "Serving at a path". **`CRAWLSPACE_TRUSTED_PROXY_HOPS` (D-105):** one more hop through the proxy,
+  but too high for direct requests to `crawlspace.onrender.com`; default unchanged.
+- **Gate before (main, ad0e62a):** lint 0, typecheck 0, `npm test` 414/414 (28 files), build 0, e2e 21/21: all exit 0.
+- **Gate after:** lint 0, typecheck 0, `npm test` 520/520 (30 files), build 0 (unset) and 0 (`/agent-check`),
+  `npm run e2e` 23/23, `npm run e2e:base-path` 4/4: all exit 0. A bad value (`bad/`) fails the build (exit 1).
+  `scripts/check-migrations.sh` and Docker cannot run here (D-26, D-71); CI decides them. CI gets two new steps.
+- **Not verified:** a base-path deploy on Render; the Worker in Cloudflare's runtime; whether `assess` is behind
+  Cloudflare's proxy; what Render does with the Worker's `X-Forwarded-Host` / `X-Forwarded-For` (operator same-origin
+  check, D-104); the Docker build with the ARG (CI's `docker` job builds it without one).
+
+**Your hand steps, in order:**
+
+1. You: pick the path name (rules: starts with `/`, no trailing slash, letters, digits, `-`, `_`).
+2. You: review the draft PR and merge after CI. The nightly merge loop treats crawlspace as production and will only
+   queue it.
+3. You: on Render set `CRAWLSPACE_BASE_PATH` (passed to the Docker build as a build arg), change the health check path
+   to `<path>/api/health`, redeploy.
+4. You: deploy the Worker (`ORIGIN`, `BASE_PATH`) and add the route `assess.labintelligence.co<path>*` in Cloudflare
+   (`deploy/cloudflare-worker/README.md`).
+5. You: re-run the smoke test at the new URL (scan, PDF, reopen); check the Use-Case Scorer Lite still works.
+6. You, optional: HubSpot leads from the PDF gate: set `CRAWLSPACE_HUBSPOT_ENABLED=1` plus `HUBSPOT_PORTAL_ID` and
+   `HUBSPOT_FORM_GUID` (`src/server/hubspot.ts`).
+7. You: revisit `CRAWLSPACE_TRUSTED_PROXY_HOPS` (D-105) through the new URL and directly.
+
 ## WebRTC guard (2026-11-20, branch `fix/webrtc-guard`)
 
 Review rank 2 (SEC-1) from PR #11's `docs/REVIEW-2026-11-20.md`: a scanned page's JavaScript could send UDP to

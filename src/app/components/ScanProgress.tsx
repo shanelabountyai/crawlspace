@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * Scan progress (Progress.dc.html, ScanOutcomes.dc.html). Polls the scan until it is done or failed, then re-renders
@@ -13,7 +14,7 @@ export function ScanProgress({ id, status, host }: { id: string; status: "queued
     let stop = false;
     const tick = async () => {
       try {
-        const res = await fetch(`/api/scans/${id}`, { cache: "no-store" });
+        const res = await fetch(withBasePath(`/api/scans/${id}`), { cache: "no-store" });
         const data = (await res.json()) as { status?: string };
         if (data.status && data.status !== status) {
           router.refresh();

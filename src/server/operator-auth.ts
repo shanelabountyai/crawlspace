@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { cookiePath } from "@/lib/base-path";
 
 /**
  * Operator access (PRD §2/§6: password env var, no accounts; D-39, D-76..D-80).
@@ -107,11 +108,11 @@ export function cookieValue(header: string | null, name: string): string | null 
 }
 
 export function sessionCookie(token: string, secure: boolean): string {
-  return `${OPERATOR_COOKIE}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MS / 1000}${secure ? "; Secure" : ""}`;
+  return `${OPERATOR_COOKIE}=${token}; Path=${cookiePath()}; HttpOnly; SameSite=Strict; Max-Age=${SESSION_MS / 1000}${secure ? "; Secure" : ""}`;
 }
 
 export function clearCookie(secure: boolean): string {
-  return `${OPERATOR_COOKIE}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
+  return `${OPERATOR_COOKIE}=; Path=${cookiePath()}; HttpOnly; SameSite=Strict; Max-Age=0${secure ? "; Secure" : ""}`;
 }
 
 /** POSTs from another origin are refused when the browser says where they came from (D-39). */

@@ -22,6 +22,7 @@ services:
     autoDeployTrigger: "off" # quoted: a bare off is a YAML boolean
 
     # GET /api/health answers 200 {"status":"ok"} without touching the database (src/app/api/health/route.ts).
+    # With CRAWLSPACE_BASE_PATH set (below), the health check moves under it: use /agent-check/api/health instead.
     healthCheckPath: /api/health
 
     # SQLite lives on the disk. Only files under mountPath survive deploys and restarts.
@@ -50,3 +51,10 @@ services:
         sync: false
       - key: HUBSPOT_FORM_GUID
         sync: false
+      # Optional, NOT SET: serve Crawlspace under a path of another site (docs/DEPLOY.md "Serving at a path", D-103).
+      # Read at BUILD time (Render passes service variables to the Docker build as build arguments; the Dockerfile
+      # declares the ARG). Not a secret. Starts with "/", no trailing slash, letters/digits/-/_ only; `next build`
+      # refuses anything else. Changing it needs a new deploy, and healthCheckPath above must change with it.
+      # Unset or empty = served at the root, exactly as today.
+      # - key: CRAWLSPACE_BASE_PATH
+      #   value: /agent-check
