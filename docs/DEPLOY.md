@@ -31,6 +31,7 @@ The owner's steps are under [Render](#render-chosen-host-d-65).
 | `CRAWLSPACE_FIXLIST_MODEL` | `claude-sonnet-4-5` | optional (D-31) |
 | `CRAWLSPACE_HUBSPOT_ENABLED` | unset → off | `1` turns on the HubSpot form submission (D-05, D-36) |
 | `HUBSPOT_PORTAL_ID`, `HUBSPOT_FORM_GUID` | unset | both needed when the flag is `1`; the form must have an `email` field |
+| `CRAWLSPACE_BASE_PATH` | unset → served at the root | **build time**, not a secret. Serve under a path of another site, e.g. `/agent-check` (D-103). Starts with `/`, no trailing slash, letters/digits/`-`/`_`; `next build` refuses anything else. Changing it needs a rebuild. See [Serving at a path](#serving-at-a-path-d-103-to-d-106) |
 
 Nothing in the environment can relax the SSRF guard (D-23, D-27).
 
@@ -247,6 +248,70 @@ Each of these is a "check it on the day" item, not a known problem.
     the app's port can be reached without passing Render's proxy. Render's docs read in these runs do not say (D-78).
     Until step 8's check is done, `CRAWLSPACE_TRUSTED_PROXY_HOPS` stays empty and the sign-in limit is shared by all
     addresses.
+
+## Serving at a path (D-103 to D-106)
+
+Added 2026-11-21. Nothing deployed. For serving Crawlspace at a path of another site, for example
+`https://assess.labintelligence.co/agent-check`, with a proxy in front of Render. **The path name is not decided**;
+`/agent-check` is the example used in the tests.
+
+**How it works.** `CRAWLSPACE_BASE_PATH` is read when the app is built and becomes Next's `basePath`
+(`next.config.ts`). Every page, API route, the health check and the security headers then live under it, and nothing
+answers outside it. Unset or empty, the build is the same as before (served at the root). URLs that Next does not
+prefix by itself (browser `fetch`, plain `<a href>`, form actions, redirects written by API routes, the operator
+cookie's `Path`, the HubSpot `pageUri`) go through one helper, `withBasePath` in `src/lib/base-path.ts`; a unit test
+fails if a new root-relative URL bypasses it.
+
+**What changes when it is set**
+
+| Thing | At the root (unset) | With `/agent-check` |
+|---|---|---|
+| Home page | `/` | `/agent-check` (no trailing slash) |
+| Health check | `/api/health` | `/agent-check/api/health`: change Render's `healthCheckPath` with it |
+| Report links | `/scans/<id>` | `/agent-check/scans/<id>` |
+| Operator page | `/operator` | `/agent-check/operator` |
+| Operator cookie | `Path=/` | `Path=/agent-check` (not sent to other apps on the same host) |
+| `crawlspace.onrender.com/` | the app | 404 |
+
+Old links to `crawlspace.onrender.com/scans/<id>` stop working once the base path is set (no redirect is added; D-104).
+
+**Proxy.** `deploy/cloudflare-worker/` holds a Worker template and its README with the hand steps: it forwards only
+`assess.labintelligence.co<BASE_PATH>/*` to Render with the same path, sets `X-Forwarded-Host` / `X-Forwarded-Proto`,
+replaces `X-Forwarded-For` with Cloudflare's client address, and leaves every other path on `assess` alone.
+
+**Your steps, in order** (details in `deploy/cloudflare-worker/README.md`):
+
+1. Pick the path name.
+2. Review and merge the pull request.
+3. On Render, add `CRAWLSPACE_BASE_PATH` (Render passes service variables to the Docker build as build arguments;
+   the `Dockerfile` declares the `ARG`), change the health check path to `<path>/api/health`, and deploy.
+4. Deploy the Worker with `ORIGIN` and `BASE_PATH`, and add the route `assess.labintelligence.co<path>*`.
+5. Re-run the live smoke test at the new URL; check the Use-Case Scorer still works.
+6. Revisit `CRAWLSPACE_TRUSTED_PROXY_HOPS` (below).
+
+**`CRAWLSPACE_TRUSTED_PROXY_HOPS` with a proxy in front (D-105).** The Worker is one more proxy, so for requests that
+come through `assess` the visitor's address sits one place further left in `X-Forwarded-For`: the number found with
+the steps in [Finding `CRAWLSPACE_TRUSTED_PROXY_HOPS` on Render](#finding-crawlspace_trusted_proxy_hops-on-render-step-8)
+becomes that number plus one. **But** while `crawlspace.onrender.com` still answers directly, a request sent straight
+to Render has one hop fewer, so the higher number is **too high** for it, and too high lets the sender choose the
+counted address (D-78). Until direct access to Render is closed, leave the number as it is for Render alone (requests
+through the proxy are then counted under Cloudflare's address, so they share limits), or leave it empty. Run the
+finding steps through the `assess` URL, and repeat step 6 of those steps against `crawlspace.onrender.com` too. The
+default is unchanged (unset).
+
+**Also note**
+
+- The security headers come with every Crawlspace response under the path. `Strict-Transport-Security` (one year, no
+  `includeSubDomains`) applies to the **whole** `assess.labintelligence.co` host once a browser sees it, so `assess`
+  must stay HTTPS-only. `X-Frame-Options: DENY` and the CSP apply to Crawlspace's pages only.
+- The operator page's same-origin check compares the browser's `Origin` with `X-Forwarded-Host` (or `Host`). Through
+  the Worker that works only if Render passes the Worker's `X-Forwarded-Host` on; not verified (D-104). The public
+  scan and PDF flow does not use that check.
+- The HubSpot `pageUri` keeps the base path, but its host comes from the request the app sees, which behind the Worker
+  may be `crawlspace.onrender.com` (not verified; HubSpot is off by default).
+
+**Not verified:** a deploy with the base path on Render; the Worker in Cloudflare's runtime; what Render does with
+`X-Forwarded-Host` and `X-Forwarded-For` from the Worker; whether `assess` is proxied by Cloudflare today.
 
 ## Before going public (any option)
 

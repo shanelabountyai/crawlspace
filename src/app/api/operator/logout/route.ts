@@ -1,4 +1,5 @@
 import { clearCookie, cookieValue, endAllSessions, isSecure, OPERATOR_COOKIE, operatorConfig, sameOrigin, verifyToken } from "@/server/operator-auth";
+import { withBasePath } from "@/lib/base-path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,5 +12,5 @@ export const dynamic = "force-dynamic";
 export async function POST(req: Request): Promise<Response> {
   const cfg = operatorConfig();
   if (sameOrigin(req) && verifyToken(cfg, cookieValue(req.headers.get("cookie"), OPERATOR_COOKIE))) endAllSessions();
-  return new Response(null, { status: 303, headers: { location: "/operator", "set-cookie": clearCookie(isSecure(req)) } });
+  return new Response(null, { status: 303, headers: { location: withBasePath("/operator"), "set-cookie": clearCookie(isSecure(req)) } });
 }

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, type FormEvent } from "react";
 import { plainError } from "./present";
+import { withBasePath } from "@/lib/base-path";
 
 /** Scan form (Form.dc.html, PhoneForm.dc.html). Posts natively without JS; with JS shows refusals in place. */
 export function ScanForm({ initialError }: { initialError?: string | null }) {
@@ -17,7 +18,7 @@ export function ScanForm({ initialError }: { initialError?: string | null }) {
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/scans", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) });
+      const res = await fetch(withBasePath("/api/scans"), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ url }) });
       const data = (await res.json()) as { id?: string; error?: string };
       if (!res.ok || !data.id) {
         setError(data.error ?? `something went wrong (HTTP ${res.status})`);
@@ -33,7 +34,7 @@ export function ScanForm({ initialError }: { initialError?: string | null }) {
 
   const msg = error ? plainError(error) : null;
   return (
-    <form className="scan-form" method="post" action="/api/scans" onSubmit={onSubmit} noValidate aria-describedby={msg ? "scan-error" : undefined}>
+    <form className="scan-form" method="post" action={withBasePath("/api/scans")} onSubmit={onSubmit} noValidate aria-describedby={msg ? "scan-error" : undefined}>
       <div className="field">
         <label htmlFor="url" className="field-label">
           Website address

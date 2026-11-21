@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react";
 import { plainError } from "./present";
+import { withBasePath } from "@/lib/base-path";
 
 /**
  * The email gate in front of the PDF download (D-35, D-38; LeadStates.dc.html). The on-screen report stays free.
@@ -20,7 +21,7 @@ export function PdfGate({ id, initialError }: { id: string; initialError?: strin
     setError(null);
     setDone(false);
     try {
-      const res = await fetch(`/api/scans/${id}/pdf`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
+      const res = await fetch(withBasePath(`/api/scans/${id}/pdf`), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email }) });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         setError(data.error ?? `something went wrong (HTTP ${res.status})`);
@@ -51,7 +52,7 @@ export function PdfGate({ id, initialError }: { id: string; initialError?: strin
         <h2 id="pdf-h">Take this report to your team</h2>
         <p>The report above is free either way. Leave your email to download the full PDF, with every check and its evidence, ready to forward to your developer.</p>
       </div>
-      <form className="pdf-form" method="post" action={`/api/scans/${id}/pdf`} onSubmit={onSubmit} noValidate>
+      <form className="pdf-form" method="post" action={withBasePath(`/api/scans/${id}/pdf`)} onSubmit={onSubmit} noValidate>
         <div className="field-row">
           <div className="field">
             <label htmlFor="pdf-email" className="field-label">

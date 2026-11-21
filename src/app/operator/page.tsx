@@ -10,6 +10,7 @@ import { getDb } from "@/server/db";
 import { OPERATOR_COOKIE, operatorConfig, verifyToken } from "@/server/operator-auth";
 import { getLeadService } from "@/server/scan-service";
 import { listScans } from "@/server/store";
+import { withBasePath } from "@/lib/base-path";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Operator · Crawlspace", robots: { index: false, follow: false } };
@@ -78,7 +79,7 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
               Operator sign-in
             </h1>
             <p className="body-2">For the site owner only. There are no accounts: the password is set on the server.</p>
-            <form method="post" action="/api/operator/login" className="field">
+            <form method="post" action={withBasePath("/api/operator/login")} className="field">
               <label htmlFor="op-password" className="field-label">
                 Password
               </label>
@@ -125,7 +126,7 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
       <BrandHeader
         trail="Operator"
         action={
-          <form method="post" action="/api/operator/logout">
+          <form method="post" action={withBasePath("/api/operator/logout")}>
             <button type="submit" className="btn btn-secondary">
               Sign out
             </button>
@@ -141,10 +142,10 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
             </p>
           </div>
           <div className="op-actions">
-            <a className="btn btn-primary" href="/api/operator/export/scans" download>
+            <a className="btn btn-primary" href={withBasePath("/api/operator/export/scans")} download>
               Export scans (CSV)
             </a>
-            <a className="btn btn-secondary" href="/api/operator/export/leads" download>
+            <a className="btn btn-secondary" href={withBasePath("/api/operator/export/leads")} download>
               Export leads (CSV)
             </a>
           </div>
@@ -219,11 +220,11 @@ export default async function OperatorPage({ searchParams }: { searchParams: Pro
                             Report
                           </Link>
                           {s.status === "done" ? (
-                            <a href={`/api/operator/scans/${s.id}/pdf`} download aria-label={`PDF for ${s.url}, ${formatWhen(s.createdAt)}`}>
+                            <a href={withBasePath(`/api/operator/scans/${s.id}/pdf`)} download aria-label={`PDF for ${s.url}, ${formatWhen(s.createdAt)}`}>
                               PDF
                             </a>
                           ) : null}
-                          <form method="post" action={`/api/operator/scans/${s.id}/rerun`}>
+                          <form method="post" action={withBasePath(`/api/operator/scans/${s.id}/rerun`)}>
                             <button type="submit" className="btn btn-secondary" aria-label={`Rerun ${s.url}, ${formatWhen(s.createdAt)}`}>
                               Rerun
                             </button>

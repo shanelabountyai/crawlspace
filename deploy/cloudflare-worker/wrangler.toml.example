@@ -1,0 +1,17 @@
+# Template for `wrangler deploy` (NOT DEPLOYED). Copy to wrangler.toml and fill in the two values.
+# Nothing here is a secret. See README.md in this folder.
+name = "crawlspace-path-proxy"
+main = "worker.ts"
+compatibility_date = "2026-11-01"
+
+# Only the base path is routed to the Worker. The pattern also matches "/agent-checkout"; the Worker checks the exact
+# boundary and passes anything else through untouched.
+routes = [
+  { pattern = "assess.labintelligence.co/agent-check*", zone_name = "labintelligence.co" },
+]
+
+[vars]
+# The Render service, scheme and host only (no path, no trailing slash).
+ORIGIN = "https://crawlspace.onrender.com"
+# Must equal CRAWLSPACE_BASE_PATH in the Crawlspace build, and the route pattern above.
+BASE_PATH = "/agent-check"

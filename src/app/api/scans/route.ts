@@ -1,6 +1,7 @@
 import { scanErrorCode } from "@/lib/report/words";
 import { getScanService } from "@/server/scan-service";
 import { PUBLIC_MAX_BODY_BYTES, readSmallBody } from "@/server/operator-auth";
+import { withBasePath } from "@/lib/base-path";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,9 +25,9 @@ export async function POST(req: Request): Promise<Response> {
   const svc = await getScanService();
   const r = await svc.submit(url);
   if (!r.ok) {
-    if (!isJson) return new Response(null, { status: 303, headers: { location: `/?error=${scanErrorCode(r.status, r.error)}#url` } });
+    if (!isJson) return new Response(null, { status: 303, headers: { location: withBasePath(`/?error=${scanErrorCode(r.status, r.error)}#url`) } });
     return Response.json({ error: r.error }, { status: r.status });
   }
-  if (!isJson) return new Response(null, { status: 303, headers: { location: `/scans/${r.id}` } });
+  if (!isJson) return new Response(null, { status: 303, headers: { location: withBasePath(`/scans/${r.id}`) } });
   return Response.json({ id: r.id, url: r.url }, { status: 201 });
 }

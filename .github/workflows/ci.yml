@@ -31,6 +31,15 @@ jobs:
           NEXT_TELEMETRY_DISABLED: "1"
       - name: e2e (Playwright, fixture sites on a local server)
         run: npm run e2e
+      # Opt-in base path (D-103): a second build with CRAWLSPACE_BASE_PATH set and the focused base-path spec. Runs after
+      # the default e2e, which used the build above without it.
+      - name: Build with a base path (/agent-check)
+        run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+          CRAWLSPACE_BASE_PATH: /agent-check
+      - name: e2e under the base path (home → scan → report → PDF gate, no-JS posts, operator, health, headers)
+        run: npm run e2e:base-path
       - uses: actions/upload-artifact@v4
         if: failure()
         with:

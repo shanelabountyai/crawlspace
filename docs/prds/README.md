@@ -13,5 +13,5 @@ D-100), rank 1 (Shane's live smoke test), ranks 32-34 (SEC-7, CQ-11, NEXT 7b: ch
 | [PRD-05](PRD-05-visual-a11y-polish.md) | Visual and accessibility polish | 21: DS-1, UX-7, A11Y-5; 25: DS-3, DS-4; 26: A11Y-4; 29: DS-5, DS-8, DS-9, DS-10; 30: DS-7; 31: A11Y-3 | M | PRD-04 (shared elements); D-60 amendment for A11Y-3 | Proposed |
 | [PRD-06](PRD-06-demo-dogfood.md) | Demo script and dogfood assets | 10 (restructure): UX-9; 20: UX-10 | S-M | Shane-owned domain for the example scan (D-18); Shane's robots/llms text; rank 1 | Proposed |
 
-Rank 9 (PDF gate moved after "Fix these first", Decision 4b, no new copy) is small and in-run-eligible; it can ship
-before or with PRD-05.
+Rank 9 (PDF gate moved after "Fix these first", Decision 4b, no new copy): built on branch `leadmagnet/2026-11-21`
+(draft PR, D-102), not merged.
