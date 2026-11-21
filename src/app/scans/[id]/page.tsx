@@ -83,10 +83,8 @@ export default async function ScanPage({ params, searchParams }: { params: Promi
           </section>
         ) : null}
         {scan.status === "done" && scan.report ? (
-          <>
-            <Report report={scan.report} scannedAt={scan.report.scorecard.fetchedAt} />
-            <PdfGate id={scan.id} initialError={pdfError} />
-          </>
+          // The PDF panel sits just after "Fix these first" (review 2026-11-20 rank 9, Decision 4b, D-102).
+          <Report report={scan.report} scannedAt={scan.report.scorecard.fetchedAt} afterFixes={<PdfGate id={scan.id} initialError={pdfError} />} />
         ) : null}
       </main>
       <BrandFooter />
