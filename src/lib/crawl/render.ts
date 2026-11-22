@@ -65,17 +65,30 @@ export type ChromiumLaunch = (options: LaunchOptions) => Promise<Browser>;
 
 export interface PlaywrightRendererOptions {
   launch?: ChromiumLaunch;
+  /** Where a sandbox refusal is remembered. Default: the process-wide memo for the real launcher, a fresh one per renderer for an injected launcher. */
+  sandboxMemo?: SandboxMemo;
 }
 
 /** Whether the browser runs inside Chromium's own sandbox, and if not, what the host said when it was tried. */
 export type SandboxOutcome = { enabled: true } | { enabled: false; refusal: string };
 
+/** A remembered sandbox refusal; `refusal` stays null until the host has refused the sandbox itself. */
+export interface SandboxMemo {
+  refusal: string | null;
+}
+
 /**
- * PRD-01 Phase A, requirement 3 (D-108): the default launcher's sandbox refusal, remembered for the life of the process
- * so that a host without user namespaces pays for the refused launch once, not on every scan. Injected launchers
- * (tests) never read or write it.
+ * PRD-01 Phase A, requirement 3 (D-108): the real launcher's sandbox refusal, remembered for the life of the process so
+ * that a host without user namespaces pays for the refused launch once, not on every scan. Only an error that is a
+ * sandbox refusal is remembered (`isSandboxRefusal`); any other launch failure (timeout, memory, missing executable)
+ * still falls back for that launch, but the next launch tries the sandbox again (D-114).
  */
-let processSandboxRefusal: string | null = null;
+const processSandboxMemo: SandboxMemo = { refusal: null };
+
+/** True when Chromium's own error line says the sandbox itself was refused (no user namespaces, root, setuid helper). */
+export function isSandboxRefusal(summary: string): boolean {
+  return /sandbox|zygote|user namespace|setuid/i.test(summary);
+}
 
 /**
  * The part of a refused launch worth logging: Chromium's own error lines from Playwright's call log (for example
@@ -103,10 +116,14 @@ export class PlaywrightRenderer implements Renderer {
   private context: BrowserContext | null = null;
   private sandboxOutcome: SandboxOutcome | null = null;
 
+  private readonly sandboxMemo: SandboxMemo;
+
   constructor(
     private readonly fetcher: Fetcher,
     private readonly options: PlaywrightRendererOptions = {},
-  ) {}
+  ) {
+    this.sandboxMemo = options.sandboxMemo ?? (options.launch ? { refusal: null } : processSandboxMemo);
+  }
 
   private async launch(options: LaunchOptions): Promise<Browser> {
     if (this.options.launch) return this.options.launch(options);
@@ -127,20 +144,25 @@ export class PlaywrightRenderer implements Renderer {
    */
   private async launchBrowser(): Promise<Browser> {
     const base: LaunchOptions = { args: [...CHROMIUM_LAUNCH.args], proxy: { ...CHROMIUM_LAUNCH.proxy }, env: chromiumLaunchEnv() };
-    const injected = this.options.launch !== undefined;
-    if (injected || processSandboxRefusal === null) {
+    // `base` is shared by both attempts, so the fallback differs from the sandboxed launch only in chromiumSandbox
+    const memo = this.sandboxMemo;
+    if (memo.refusal === null) {
       try {
         const browser = await this.launch({ ...base, chromiumSandbox: true });
         this.sandboxOutcome = { enabled: true };
         return browser;
       } catch (e) {
         const refusal = summarizeLaunchError(e instanceof Error ? e.message : String(e));
-        console.warn(`crawlspace: Chromium sandbox refused, rendering with --no-sandbox (PRD-01 Phase A, D-108): ${refusal}`);
-        if (!injected) processSandboxRefusal = refusal;
+        if (isSandboxRefusal(refusal)) {
+          console.warn(`crawlspace: Chromium sandbox refused, rendering with --no-sandbox (PRD-01 Phase A, D-108): ${refusal}`);
+          memo.refusal = refusal;
+        } else {
+          console.warn(`crawlspace: sandboxed Chromium launch failed for another reason, this launch uses --no-sandbox, the next one tries the sandbox again (D-114): ${refusal}`);
+        }
         this.sandboxOutcome = { enabled: false, refusal };
       }
     } else {
-      this.sandboxOutcome = { enabled: false, refusal: processSandboxRefusal };
+      this.sandboxOutcome = { enabled: false, refusal: memo.refusal };
     }
     return this.launch({ ...base, chromiumSandbox: false });
   }

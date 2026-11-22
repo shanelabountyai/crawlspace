@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Browser, LaunchOptions } from "playwright";
 import type { Fetcher, FetchResult } from "@/lib/crawl/fetcher";
-import { PlaywrightRenderer, summarizeLaunchError } from "@/lib/crawl/render";
+import { PlaywrightRenderer, isSandboxRefusal, summarizeLaunchError, type SandboxMemo } from "@/lib/crawl/render";
 
 // PRD-01 Phase A, requirement 3: try Chromium's own sandbox. Where the host refuses it (no user namespaces), keep
 // today's `--no-sandbox` launch and say so, rather than fail every scan (D-108). Launch options captured by injection.
@@ -81,5 +81,54 @@ describe("summarizeLaunchError", () => {
 
   it("falls back to the first line", () => {
     expect(summarizeLaunchError("browserType.launch: Executable doesn't exist\nmore")).toBe("browserType.launch: Executable doesn't exist");
+  });
+});
+
+// The memo the real launcher shares for the whole process (D-108, D-114), exercised here with a memo of the test's own.
+describe("PRD-01 requirement 3: a sandbox refusal is remembered, other launch failures are not", () => {
+  function launcher(error: string | null) {
+    const calls: (boolean | undefined)[] = [];
+    const launch = async (options: LaunchOptions): Promise<Browser> => {
+      calls.push(options.chromiumSandbox);
+      if (options.chromiumSandbox && error) throw new Error(error);
+      return launched;
+    };
+    return { calls, launch };
+  }
+
+  it("after the host refuses the sandbox, later renderers sharing the memo skip the sandboxed attempt", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const memo: SandboxMemo = { refusal: null };
+    const { calls, launch } = launcher("browserType.launch: closed\n  - [pid=7][err] [1122/0:FATAL:zygote_host_impl_linux.cc(129)] No usable sandbox!");
+    await expect(new PlaywrightRenderer(noFetch, { launch, sandboxMemo: memo }).render(main)).rejects.toThrow("sentinel: launched");
+    const second = new PlaywrightRenderer(noFetch, { launch, sandboxMemo: memo });
+    await expect(second.render(main)).rejects.toThrow("sentinel: launched");
+    expect(calls).toEqual([true, false, false]);
+    expect(memo.refusal).toContain("No usable sandbox!");
+    expect(second.sandbox).toEqual({ enabled: false, refusal: memo.refusal });
+    expect(warn).toHaveBeenCalledTimes(1);
+    warn.mockRestore();
+  });
+
+  it("a launch failure that is not a sandbox refusal falls back for that launch only; the next launch tries the sandbox again", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const memo: SandboxMemo = { refusal: null };
+    const { calls, launch } = launcher("browserType.launch: Timeout 180000ms exceeded.");
+    const first = new PlaywrightRenderer(noFetch, { launch, sandboxMemo: memo });
+    await expect(first.render(main)).rejects.toThrow("sentinel: launched");
+    expect(first.sandbox).toEqual({ enabled: false, refusal: expect.stringContaining("Timeout") });
+    expect(memo.refusal).toBeNull();
+    await expect(new PlaywrightRenderer(noFetch, { launch, sandboxMemo: memo }).render(main)).rejects.toThrow("sentinel: launched");
+    expect(calls).toEqual([true, false, true, false]);
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("tries the sandbox again"));
+    warn.mockRestore();
+  });
+
+  it("isSandboxRefusal: the refusals seen in CI and as root, not timeouts or a missing executable", () => {
+    expect(isSandboxRefusal("[1122/011938.252026:FATAL:content/browser/zygote_host/zygote_host_impl_linux.cc:129] No usable sandbox!")).toBe(true);
+    expect(isSandboxRefusal("[1122/011316.066842:ERROR:content/browser/zygote_host/zygote_host_impl_linux.cc:117] Running as root without --no-sandbox is not supported.")).toBe(true);
+    expect(isSandboxRefusal("browserType.launch: Timeout 180000ms exceeded.")).toBe(false);
+    expect(isSandboxRefusal("browserType.launch: Executable doesn't exist at /ms-playwright/chromium")).toBe(false);
+    expect(isSandboxRefusal("spawn EMFILE")).toBe(false);
   });
 });
