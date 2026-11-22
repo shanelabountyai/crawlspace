@@ -23,10 +23,12 @@ moved). Phase B not started (Decision 9b).
 - **Gate before (main, 358a5ba):** `npm ci` 0, lint 0, typecheck 0, `npm test` 520/520 (30 files), build 0,
   `npm run e2e` 23/23, base-path build 0, `npm run e2e:base-path` 4/4.
 - **Gate after (branch):** `npm ci` 0, lint 0, typecheck 0, `npm test` 531/531 (32 files), build 0, `npm run e2e`
-  23/23, base-path build 0, `npm run e2e:base-path` 4/4. CI on 9d34fb4: `check` success, `docker` success. Final CI
-  results are in the PR body.
-- **Not verified:** anything on Render (sandbox, launch, memory); the Docker build locally (D-71); Phase B's
-  residual risk stays: without a sandbox, native code in a compromised renderer runs as `node` like the server (D-112).
+  23/23, base-path build 0, `npm run e2e:base-path` 4/4. CI: `check` and `docker` success on 9d34fb4; `docker`
+  success on 0237c0a. Final CI results are in the PR body.
+- **Residual risk, measured (D-112):** in CI's image the server's `/proc/<pid>/environ` is readable by `node`. With the
+  sandbox refused, native code in a compromised renderer (needs a Chromium exploit) could still read it and `/data`.
+  That is Phase B. Page JS cannot (blocked by interception; checked).
+- **Not verified:** anything on Render (sandbox, launch, memory); the Docker build locally (D-71).
 
 **Your hand steps, in order:**
 
