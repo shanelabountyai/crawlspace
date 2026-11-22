@@ -6,7 +6,7 @@ D-100), rank 1 (Shane's live smoke test), ranks 32-34 (SEC-7, CQ-11, NEXT 7b: ch
 
 | PRD | Title | Review items (rank: lens IDs) | Size | Depends on | Status |
 |---|---|---|---|---|---|
-| [PRD-01](PRD-01-browser-isolation.md) | Headless browser isolation | 14: SEC-2 (SEC-1 done in PR #12) | M (A) / L (B) | PR #12 merged; rank 1 smoke test; CI `docker` job | Proposed |
+| [PRD-01](PRD-01-browser-isolation.md) | Headless browser isolation | 14: SEC-2 (SEC-1 done in PR #12) | M (A) / L (B) | PR #12 merged; rank 1 smoke test; CI `docker` job | Phase A built (draft PR) |
 | [PRD-02](PRD-02-crawl-correctness.md) | Crawl correctness and politeness | 15: CQ-2, CQ-9; 16: CQ-3, UX-1 (crawler); 17 (part): CQ-8; 27: UX-5; 28: SEC-8 | M | Shane's OK on scoring-adjacent behaviour; PR #12 / PRD-01 (`render.ts`); rank 1 | Proposed |
 | [PRD-03](PRD-03-abuse-capacity-retention.md) | Abuse limits, capacity and retention | 17: SEC-3, SEC-6, NEXT 4; 18: CQ-5; 19: CQ-7; 22 (part): SEC-9 | M | `CRAWLSPACE_TRUSTED_PROXY_HOPS` set on Render (Shane, Decision 6a); limit numbers from Shane; PRD-04 wording | Proposed |
 | [PRD-04](PRD-04-report-copy.md) | Report and fix-list copy | 7: UX-2, DS-6; 8: UX-1 (note); 22: UX-4, UX-6, UX-11, A11Y-6; 23: UX-8; 24: CQ-10 | M | Shane's wording; Shane's OK for evidence pass/fail in checks; `ANTHROPIC_API_KEY` (Decision 1a) | Proposed |
