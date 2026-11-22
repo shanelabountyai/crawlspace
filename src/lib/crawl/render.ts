@@ -67,6 +67,28 @@ export interface PlaywrightRendererOptions {
   launch?: ChromiumLaunch;
 }
 
+/** Whether the browser runs inside Chromium's own sandbox, and if not, what the host said when it was tried. */
+export type SandboxOutcome = { enabled: true } | { enabled: false; refusal: string };
+
+/**
+ * PRD-01 Phase A, requirement 3 (D-108): the default launcher's sandbox refusal, remembered for the life of the process
+ * so that a host without user namespaces pays for the refused launch once, not on every scan. Injected launchers
+ * (tests) never read or write it.
+ */
+let processSandboxRefusal: string | null = null;
+
+/**
+ * The part of a refused launch worth logging: Chromium's own error lines from Playwright's call log (for example
+ * "No usable sandbox!" or "Running as root without --no-sandbox is not supported"), without colour codes or the
+ * full command line. Falls back to the first line of the message.
+ */
+export function summarizeLaunchError(message: string): string {
+  const lines = message.replace(/\u001b\[[0-9;]*m/g, "").split("\n").map((l) => l.trim()).filter(Boolean);
+  const chromium = lines.filter((l) => /\[err\]|FATAL|ERROR:/.test(l)).map((l) => l.replace(/^- \[pid=\d+\]\[err\]\s*/, ""));
+  const picked = chromium.length ? chromium : lines.slice(0, 1);
+  return picked.join(" | ").slice(0, 600);
+}
+
 const ASSET_TYPES = new Set(["script", "xhr", "fetch"]);
 
 /**
@@ -79,6 +101,7 @@ export class PlaywrightRenderer implements Renderer {
   readonly events: RenderEvent[] = [];
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
+  private sandboxOutcome: SandboxOutcome | null = null;
 
   constructor(
     private readonly fetcher: Fetcher,
@@ -91,9 +114,40 @@ export class PlaywrightRenderer implements Renderer {
     return chromium.launch(options);
   }
 
+  /** How the current browser was launched; null before the first render. */
+  get sandbox(): SandboxOutcome | null {
+    return this.sandboxOutcome;
+  }
+
+  /**
+   * Chromium's sandbox first (PRD-01 Phase A, requirement 3). If the host refuses it (typically: no user namespaces
+   * for an unprivileged user), launch as before with Playwright's `--no-sandbox` and log the refusal once, instead
+   * of failing every scan. A page cannot cause the fallback: it happens at launch, before any page is opened. Every
+   * other guard (allowlisted env, DNS off, dead proxy, WebRTC flags) is the same in both launches (D-108).
+   */
+  private async launchBrowser(): Promise<Browser> {
+    const base: LaunchOptions = { args: [...CHROMIUM_LAUNCH.args], proxy: { ...CHROMIUM_LAUNCH.proxy }, env: chromiumLaunchEnv() };
+    const injected = this.options.launch !== undefined;
+    if (injected || processSandboxRefusal === null) {
+      try {
+        const browser = await this.launch({ ...base, chromiumSandbox: true });
+        this.sandboxOutcome = { enabled: true };
+        return browser;
+      } catch (e) {
+        const refusal = summarizeLaunchError(e instanceof Error ? e.message : String(e));
+        console.warn(`crawlspace: Chromium sandbox refused, rendering with --no-sandbox (PRD-01 Phase A, D-108): ${refusal}`);
+        if (!injected) processSandboxRefusal = refusal;
+        this.sandboxOutcome = { enabled: false, refusal };
+      }
+    } else {
+      this.sandboxOutcome = { enabled: false, refusal: processSandboxRefusal };
+    }
+    return this.launch({ ...base, chromiumSandbox: false });
+  }
+
   private async ctx(): Promise<BrowserContext> {
     if (this.context) return this.context;
-    this.browser = await this.launch({ args: [...CHROMIUM_LAUNCH.args], proxy: { ...CHROMIUM_LAUNCH.proxy }, env: chromiumLaunchEnv() });
+    this.browser = await this.launchBrowser();
     this.context = await this.browser.newContext({ userAgent: USER_AGENT, serviceWorkers: "block", acceptDownloads: false, javaScriptEnabled: true });
     // And page scripts never get WebRTC at all, in every frame (D-100). Removed before any page script runs.
     await this.context.addInitScript(() => {
