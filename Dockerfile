@@ -41,7 +41,7 @@ COPY . .
 ARG CRAWLSPACE_BASE_PATH=""
 ENV CRAWLSPACE_BASE_PATH=${CRAWLSPACE_BASE_PATH}
 RUN npm run build \
- && find /app -xdev ! -type l -perm -o+w -exec chmod o-w {} + \
+ && find /app -xdev ! -type l -perm -o+w -print -exec chmod o-w {} + \
  && if find /app -xdev ! -type l \( -user node -o -perm -o+w \) | grep -q .; then echo "/app has files node can write" >&2; exit 1; fi
 
 # The container starts as root only so the entrypoint can make the mounted disk writable, then drops to `node`
