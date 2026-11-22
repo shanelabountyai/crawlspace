@@ -1,4 +1,4 @@
-import type { Browser, BrowserContext, Route } from "playwright";
+import type { Browser, BrowserContext, LaunchOptions, Route } from "playwright";
 import { MAX_ASSETS_PER_PAGE, RENDER_IDLE_MS, RENDER_TIMEOUT_MS, USER_AGENT } from "./config";
 import type { FetchResult, Fetcher } from "./fetcher";
 
@@ -42,6 +42,31 @@ export const CHROMIUM_LAUNCH = {
   proxy: { server: "http://127.0.0.1:9" },
 };
 
+/**
+ * The only environment variables the rendering browser gets (PRD-01 Phase A, requirement 1; review 2026-11-20, SEC-2).
+ * Chromium renders pages chosen by anonymous visitors, so it never inherits the server's environment: no
+ * `ANTHROPIC_API_KEY`, `CRAWLSPACE_*` (operator password included), `HUBSPOT_*` or `DATABASE_FILE`, and nothing else
+ * that is not listed here. Playwright passes `process.env` to the browser when `env` is left out, so it is always set.
+ */
+export const CHROMIUM_ENV_ALLOWLIST: readonly string[] = ["HOME", "PATH", "TZ", "LANG", "LC_ALL", "TMPDIR", "PLAYWRIGHT_BROWSERS_PATH"];
+
+/** The browser's environment: the allowlisted names that are set in `source`, nothing else. */
+export function chromiumLaunchEnv(source: Readonly<Record<string, string | undefined>> = process.env): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const name of CHROMIUM_ENV_ALLOWLIST) {
+    const value = source[name];
+    if (value !== undefined && value !== "") env[name] = value;
+  }
+  return env;
+}
+
+/** Starts the browser. Injected in tests to capture the launch options (tests/crawl/render-env.test.ts). */
+export type ChromiumLaunch = (options: LaunchOptions) => Promise<Browser>;
+
+export interface PlaywrightRendererOptions {
+  launch?: ChromiumLaunch;
+}
+
 const ASSET_TYPES = new Set(["script", "xhr", "fetch"]);
 
 /**
@@ -55,12 +80,20 @@ export class PlaywrightRenderer implements Renderer {
   private browser: Browser | null = null;
   private context: BrowserContext | null = null;
 
-  constructor(private readonly fetcher: Fetcher) {}
+  constructor(
+    private readonly fetcher: Fetcher,
+    private readonly options: PlaywrightRendererOptions = {},
+  ) {}
+
+  private async launch(options: LaunchOptions): Promise<Browser> {
+    if (this.options.launch) return this.options.launch(options);
+    const { chromium } = await import("playwright");
+    return chromium.launch(options);
+  }
 
   private async ctx(): Promise<BrowserContext> {
     if (this.context) return this.context;
-    const { chromium } = await import("playwright");
-    this.browser = await chromium.launch({ args: [...CHROMIUM_LAUNCH.args], proxy: { ...CHROMIUM_LAUNCH.proxy } });
+    this.browser = await this.launch({ args: [...CHROMIUM_LAUNCH.args], proxy: { ...CHROMIUM_LAUNCH.proxy }, env: chromiumLaunchEnv() });
     this.context = await this.browser.newContext({ userAgent: USER_AGENT, serviceWorkers: "block", acceptDownloads: false, javaScriptEnabled: true });
     // And page scripts never get WebRTC at all, in every frame (D-100). Removed before any page script runs.
     await this.context.addInitScript(() => {
