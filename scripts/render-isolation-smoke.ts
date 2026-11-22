@@ -60,7 +60,8 @@ function leaks(text: string): string[] {
 /** The Next server started by the entrypoint, if one is running in this container. */
 function findServerPid(): number | null {
   const { cmd } = procTable();
-  for (const [pid, c] of cmd) if (pid !== process.pid && /next(\/dist\/bin\/next)? start/.test(c)) return pid;
+  // Next renames its process title to "next-server (vX.Y.Z)", so match that as well as the command the entrypoint runs
+  for (const [pid, c] of cmd) if (pid !== process.pid && /next-server|next(\/dist\/bin\/next)? start/.test(c)) return pid;
   return null;
 }
 
