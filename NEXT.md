@@ -29,6 +29,8 @@ moved). Phase B not started (Decision 9b).
   sandbox refused, native code in a compromised renderer (needs a Chromium exploit) could still read it and `/data`.
   That is Phase B. Page JS cannot (blocked by interception; checked).
 - **Not verified:** anything on Render (sandbox, launch, memory); the Docker build locally (D-71).
+- **Overnight review (comment on #16):** 0 must-fix, 3 should-fix, 4 nits. Fixed the sticky fallback and its missing
+  test (D-114), this step-3 wording, the D-108 count and one nit (Dockerfile `-print`). Gate after: see the PR body.
 
 **Your hand steps, in order:**
 
@@ -37,7 +39,9 @@ moved). Phase B not started (Decision 9b).
    steps 6-7): health route, one full scan of a site you own that needs JavaScript, its PDF, restart, reopen.
 3. You: in Render's logs after that scan, look for `crawlspace: Chromium sandbox refused, rendering with --no-sandbox`.
    Present = Render has no user namespaces either; scans still work as before and Phase B (Decision 9b) is the next
-   step. Absent and the scan rendered = the sandbox is on.
+   step. Absent **and** the scan rendered = the sandbox is on; absent with no rendered scan tells you nothing. A line
+   `sandboxed Chromium launch failed for another reason` is not a refusal (D-114). Details: `docs/DEPLOY.md`
+   "Headless browser isolation", "On Render after deploying this".
 4. If Chromium fails to launch on Render (scans fail; `browserType.launch` errors in the log), or the log shows
    `EACCES`/`EROFS`: roll back to the previous deploy in Render's dashboard and send the log lines
    (`docs/DEPLOY.md` "Headless browser isolation").

@@ -279,7 +279,9 @@ CI's `check` and `docker` jobs run, then update the two numbers here. Not bumped
 
 - Look in the service's logs for the `Chromium sandbox refused` line after the first scan. It shows once per process.
   Present: Render gives no user namespaces, the browser runs as it did before this change (env and `/app` still
-  isolated); PRD-01 Phase B is the next step. Absent, and the scan rendered: the sandbox is on.
+  isolated); PRD-01 Phase B is the next step. Absent, and the scan rendered: the sandbox is on. A different line,
+  `sandboxed Chromium launch failed for another reason`, means that one launch failed for something other than the
+  sandbox (timeout, memory) and the next launch tries the sandbox again (D-114); if it shows on every scan, send it.
 - If scans fail and the logs show a Chromium launch error **without** that line, or `browserType.launch` errors after
   it: the unsandboxed fallback also failed; that is not expected from this change (its launch options are the ones
   used before, plus the smaller env). Roll back to the previous deploy in Render's dashboard and send the log lines.
