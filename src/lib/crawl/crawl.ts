@@ -3,7 +3,7 @@ import { pathOf } from "../html";
 import { SnapshotSchema, type Page, type PageKind, type Resource, type Snapshot } from "../snapshot";
 import { MAX_KEY_PAGES, ROBOTS_TOKEN } from "./config";
 import { extractLinks, findActionLink, guessSiteType, pageKind, parseSitemap, pickKeyPages, sameSite } from "./discover";
-import { BudgetExceeded, Fetcher, type FetchResult, type FetcherOptions } from "./fetcher";
+import { BudgetExceeded, Fetcher, type FetchResult, type FetcherOptions, type GetOptions } from "./fetcher";
 import { NoRenderer, PlaywrightRenderer, type RenderEvent, type Renderer } from "./render";
 import { assertAllowed, parseTarget, SsrfError } from "./ssrf";
 
@@ -61,10 +61,11 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
   const report: CrawlReport = { requests: fetcher.log, renderEvents: renderer.events, skipped: [], notes: [] };
   const fetchedAt = new Date().toISOString();
 
-  const tryGet = async (url: string, why: string): Promise<FetchResult | null> => {
+  const tryGet = async (url: string, why: string, options?: GetOptions): Promise<FetchResult | null> => {
     try {
-      return await fetcher.get(url, "page");
+      return await fetcher.get(url, "page", options);
     } catch (e) {
+      if (e instanceof CrawlRefused) throw e; // a robots.txt stop raised from a redirect hop
       if (e instanceof BudgetExceeded) report.skipped.push({ url, reason: `page budget used up (${why})` });
       else if (e instanceof SsrfError) report.skipped.push({ url, reason: `refused: ${e.message}` });
       else report.notes.push(`${why} ${url} failed: ${errText(e)}`);
@@ -110,8 +111,9 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
     };
     await assertRobotsAllow(startUrl);
 
-    // 2. home page (follows redirects; the final URL defines the site)
-    const homeRes = await tryGet(startUrl, "home page");
+    // 2. home page (follows redirects; the final URL defines the site). Before each redirect hop is requested, the
+    //    robots.txt of the hop's origin is read and applied, so a site that says no gets no request but that file.
+    const homeRes = await tryGet(startUrl, "home page", { beforeRedirect: assertRobotsAllow });
     if (!homeRes) throw new CrawlRefused(`could not fetch the home page: ${report.notes.at(-1) ?? report.skipped.at(-1)?.reason ?? "unknown error"}`);
     const home = homeRes.url;
     const origin = new URL(home).origin;

@@ -109,4 +109,62 @@ describe("robots.txt on a network error and after a cross-origin home redirect",
     const e = await refusal("http://robots-unreachable.test:1/");
     expect(e.message).toMatch(/^robots\.txt could not be read \(.+\); treating as disallow-all and not scanning$/);
   }, 30_000);
+
+  it("a → b, b disallows /: refused, naming b; b gets no request other than /robots.txt", async () => {
+    const b = srv.site("b-closed.test", { "/robots.txt": closedRobots, "/": openHome });
+    const a = srv.site("a-moved.test", { "/": { status: 301, headers: { location: `${b}/` } } });
+    const e = await refusal(`${a}/`);
+    expect(e.message).toContain(`b-closed.test:${srv.port}`);
+    expect(e.message).toMatch(/robots\.txt .*disallows CrawlspaceBot from \/; not scanning$/);
+    expect(paths("b-closed.test")).toEqual(["/robots.txt"]);
+    expect(paths("a-moved.test")).toEqual(["/robots.txt", "/"]);
+  }, 30_000);
+
+  it("d → c, c's robots.txt answers 503: refused, naming c; c gets no request other than /robots.txt", async () => {
+    const c = srv.site("c-down.test", { "/robots.txt": { status: 503, type: "text/plain", body: "busy" }, "/": openHome });
+    const d = srv.site("d-moved.test", { "/": { status: 302, headers: { location: `${c}/` } } });
+    const e = await refusal(`${d}/`);
+    expect(e.message).toContain(`c-down.test:${srv.port}`);
+    expect(e.message).toMatch(/robots\.txt .*returned 503; treating as disallow-all and not scanning$/);
+    expect(paths("c-down.test")).toEqual(["/robots.txt"]);
+  }, 30_000);
+
+  it("e → f, f's robots.txt cannot be read: refused, naming f; f gets no request other than /robots.txt", async () => {
+    const f = srv.site("f-dead.test", { "/robots.txt": { destroy: true }, "/": openHome });
+    const eBase = srv.site("e-moved.test", { "/": { status: 307, headers: { location: `${f}/` } } });
+    const e = await refusal(`${eBase}/`);
+    expect(e.message).toContain(`f-dead.test:${srv.port}`);
+    expect(e.message).toMatch(/robots\.txt .*could not be read \(.+\); treating as disallow-all and not scanning$/);
+    expect(paths("f-dead.test")).toEqual(["/robots.txt"]);
+  }, 30_000);
+
+  it("a redirect on the same origin into a disallowed path is refused before that path is requested", async () => {
+    const base = srv.site("inward.test", {
+      "/robots.txt": { type: "text/plain", body: "User-agent: *\nDisallow: /members/\n" },
+      "/": { status: 302, headers: { location: "/members/home" } },
+      "/members/home": openHome,
+    });
+    const e = await refusal(`${base}/`);
+    expect(e.message).toBe("robots.txt disallows CrawlspaceBot from /members/home; not scanning");
+    expect(paths("inward.test")).toEqual(["/robots.txt", "/"]);
+  }, 30_000);
+
+  it("g → h, h allows it: h's robots.txt is read before anything else on h, and the scan uses h's rules", async () => {
+    const h = srv.site("h-open.test", {
+      "/robots.txt": { type: "text/plain", body: "User-agent: CrawlspaceBot\nDisallow: /products/secret\n" },
+      "/": { body: '<h1>Home</h1><a href="/products/secret">S</a><a href="/products/open">O</a>' },
+      "/products/open": { body: "<h1>Open</h1><p>$1.00</p>" },
+      "/products/secret": { body: "<h1>Secret</h1>" },
+    });
+    const g = srv.site("g-moved.test", { "/": { status: 301, headers: { location: `${h}/` } } });
+    const { snapshot, report } = await crawlSite(`${g}/`, opts);
+    expect(paths("h-open.test")[0]).toBe("/robots.txt");
+    expect(paths("h-open.test")).toContain("/products/open");
+    expect(paths("h-open.test")).not.toContain("/products/secret");
+    expect(paths("h-open.test").filter((p) => p === "/robots.txt")).toHaveLength(1);
+    expect(snapshot.url).toBe(`${h}/`);
+    expect(snapshot.robots?.url).toBe(`${h}/robots.txt`);
+    expect(report.notes).toContain(`home redirected to ${h}; using its robots.txt`);
+    expect(report.skipped.some((s) => s.url.endsWith("/products/secret"))).toBe(true);
+  }, 60_000);
 });

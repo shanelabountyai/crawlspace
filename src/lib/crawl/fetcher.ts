@@ -31,6 +31,15 @@ export class BudgetExceeded extends Error {
   }
 }
 
+export interface GetOptions {
+  /**
+   * Called before each redirect hop is requested, after the SSRF check on it and before it counts against the budget.
+   * Throw to stop: nothing is sent to the hop's URL. The crawler reads the new origin's robots.txt here (PRD-02
+   * requirement 1).
+   */
+  beforeRedirect?: (url: string) => Promise<void>;
+}
+
 export interface FetcherOptions {
   guard?: GuardOptions;
   /** Tests: a clock of their own. A fetcher given one gets a private limiter on that clock unless `limiter` is set. */
@@ -87,11 +96,12 @@ export class Fetcher {
     }
   }
 
-  async get(rawUrl: string, kind: RequestKind): Promise<FetchResult> {
+  async get(rawUrl: string, kind: RequestKind, options: GetOptions = {}): Promise<FetchResult> {
     const redirects: string[] = [];
     let url = parseTarget(rawUrl).href;
     for (let hop = 0; ; hop++) {
       await assertAllowed(url, this.opts.guard); // refuse before any connection (CS-03)
+      if (hop > 0) await options.beforeRedirect?.(url);
       this.take(kind); // a redirect hop is a request and counts (CS-02)
       const host = new URL(url).host;
       const startedAt = await this.limiter.acquire(host); // the granted slot (D-47)
