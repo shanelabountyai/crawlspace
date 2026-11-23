@@ -103,6 +103,21 @@ describe("web scan service (same scanner, guard and scoring as the CLI)", () => 
     expect(v.report).toBeNull();
   }, 30_000);
 
+  // PRD-02 requirement 5 (Decision 3c)
+  it("a site whose home page answers 404 ends as a stopped scan that says why, with no report", async () => {
+    const gone = srv.site("gone.test", { "/": { status: 404, body: "<h1>Not found</h1>" } });
+    const svc = new ScanService(store(), { crawl: { guard: testGuard, render: false } });
+    const r = await svc.submit(`${gone}/some/deep/link`);
+    if (!r.ok) throw new Error(r.error);
+    expect(r.url).toBe(`${gone}/some/deep/link`); // the address as entered is kept on the scan (requirement 4)
+    await svc.idle();
+    const v = (await svc.store.get(r.id))!;
+    expect(v.url).toBe(`${gone}/some/deep/link`);
+    expect(v.status).toBe("failed");
+    expect(v.error).toBe(`refused: the home page ${gone}/ answered HTTP 404; not scanning`);
+    expect(v.report).toBeNull();
+  }, 30_000);
+
   it("rejects empty, non-string and over-long input, and caps the queue", async () => {
     const svc = new ScanService(store(), { crawl: { guard: testGuard, render: false }, queueLimit: 1 });
     expect(await svc.submit("")).toMatchObject({ ok: false, status: 400 });

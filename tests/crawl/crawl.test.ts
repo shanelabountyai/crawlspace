@@ -225,3 +225,51 @@ describe("the crawl starts at the origin root", () => {
     expect(srv.hits.filter((h) => h.host === "partly-closed.test").map((h) => h.path)).not.toContain("/account/orders");
   }, 60_000);
 });
+
+// PRD-02 requirement 5 (review 2026-11-20, UX-1 / CQ-3; Decision 3c): a home page that answers 4xx/5xx is not scored.
+describe("a home page that answers an error stops the scan", () => {
+  let srv: SiteServer;
+  const opts = { guard: testGuard, render: false } as const;
+  const paths = (host: string) => srv.hits.filter((h) => h.host === host).map((h) => h.path);
+  const errorPage = (what: string) => ({ body: `<!doctype html><html><head><title>${what}</title></head><body><h1>${what}</h1><a href="/products/x">x</a></body></html>` });
+
+  beforeAll(async () => {
+    srv = await new SiteServer().start();
+  });
+  afterAll(async () => {
+    await srv.stop();
+  });
+
+  it.each([404, 410, 500, 502])("home answers %i: CrawlRefused with the address and the status; nothing after the home page is requested", async (status) => {
+    const host = `home-${status}.test`;
+    const base = srv.site(host, { "/": { status, ...errorPage("Oops") }, "/products/x": errorPage("X"), "/sitemap.xml": { type: "application/xml", body: "<urlset></urlset>" } });
+    const e = await crawlSite(`${base}/`, opts).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(CrawlRefused);
+    expect((e as CrawlRefused).message).toBe(`the home page ${base}/ answered HTTP ${status}; not scanning`);
+    expect((e as CrawlRefused).message).not.toMatch(/robots\.txt/); // the scan page shows robots.txt stops as a finding (D-62)
+    expect(paths(host)).toEqual(["/robots.txt", "/"]);
+  }, 30_000);
+
+  it("a home page that redirects to an error page stops too, naming where it ended", async () => {
+    const base = srv.site("home-gone.test", { "/": { status: 302, headers: { location: "/gone" } }, "/gone": { status: 404, ...errorPage("Gone") } });
+    await expect(crawlSite(`${base}/`, opts)).rejects.toThrow(`the home page ${base}/gone answered HTTP 404; not scanning`);
+    expect(paths("home-gone.test")).toEqual(["/robots.txt", "/", "/gone"]);
+  }, 30_000);
+
+  it.each([401, 403, 429, 503])("a home page behind a wall (%i) is still scanned and stays an A4 finding (D-15)", async (status) => {
+    const base = srv.site(`walled-${status}.test`, { "/": { status, ...errorPage("Access denied") } });
+    const { snapshot } = await crawlSite(`${base}/`, opts);
+    expect(snapshot.pages[0]).toMatchObject({ kind: "home", status });
+    const card = scanSnapshot(snapshot, { agents: fixtureAgents() });
+    expect(card.checks.find((c) => c.id === "A4")?.status).toBe("fail");
+  }, 60_000);
+
+  it("a challenge page served with an error status is a wall, not a stop", async () => {
+    const base = srv.site("challenge.test", { "/": { status: 404, body: "<!doctype html><html><head><title>Just a moment...</title></head><body>Checking your browser</body></html>" } });
+    const { snapshot } = await crawlSite(`${base}/`, opts);
+    expect(scanSnapshot(snapshot, { agents: fixtureAgents() }).checks.find((c) => c.id === "A4")?.status).toBe("fail");
+  }, 60_000);
+});

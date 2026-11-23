@@ -1,4 +1,5 @@
 import { isAllowed, robotsAccess, sitemapsFromRobots, type RobotsFetch, type RobotsGroup } from "../robots";
+import { wallReason } from "../checks/a4-no-bot-wall";
 import { pathOf } from "../html";
 import { SnapshotSchema, type Page, type PageKind, type Resource, type Snapshot } from "../snapshot";
 import { MAX_KEY_PAGES, ROBOTS_TOKEN } from "./config";
@@ -120,6 +121,12 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
     if (!homeRes) throw new CrawlRefused(`could not fetch the home page: ${report.notes.at(-1) ?? report.skipped.at(-1)?.reason ?? "unknown error"}`);
     const home = homeRes.url;
     const origin = new URL(home).origin;
+    // A home page that answers 4xx/5xx is an error page, not the site: stop instead of scoring it (PRD-02 requirement 5;
+    // Decision 3c). The exception is what A4 already reports as a bot wall (401/403/429/503 or a challenge page): that
+    // is what an agent meets too, so it stays a finding on a finished report (D-15).
+    if (homeRes.status >= 400 && wallReason({ status: homeRes.status, rawHtml: homeRes.body }) === null) {
+      throw new CrawlRefused(`the home page ${home} answered HTTP ${homeRes.status}; not scanning`);
+    }
     if (origin !== origin0) report.notes.push(`home redirected to ${origin}; using its robots.txt`);
     const { resource: robots, groups } = await robotsFor(origin);
     const allowed = (url: string) => isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed;
