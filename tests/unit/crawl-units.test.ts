@@ -35,6 +35,10 @@ describe("normaliseStartUrl", () => {
     expect(normaliseStartUrl("goodshop.test:7911/products/x?y=1")).toBe("https://goodshop.test:7911/products/x?y=1");
     expect(normaliseStartUrl(" Shop.Example:8443 ")).toBe("https://shop.example:8443/");
   });
+  it("a :// inside the path or query of a scheme-less address is not a scheme (D-125)", () => {
+    expect(normaliseStartUrl("shop.example/login?next=https://shop.example/")).toBe("https://shop.example/login?next=https://shop.example/");
+    expect(normaliseStartUrl("shop.example:8443/go?to=http://other.example/x")).toBe("https://shop.example:8443/go?to=http://other.example/x");
+  });
   it("keeps an explicit http or https scheme, in any letter case", () => {
     expect(normaliseStartUrl("http://goodshop.test:7911/")).toBe("http://goodshop.test:7911/");
     expect(normaliseStartUrl("HTTP://shop.example")).toBe("http://shop.example/");

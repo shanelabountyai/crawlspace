@@ -47,7 +47,7 @@ export function runCheck(check: CheckDefinition, ctx: CheckContext, weights: Wei
   const na = (detail: string) => ({ status: "not-applicable" as const, evidence: [{ detail }] });
   const outcome = !applies(check, ctx.siteType)
     ? na(`does not apply to site type '${ctx.siteType}'`)
-    : check.needsRendered && !ctx.snapshot.rendered
+    : check.needsRendered && ctx.snapshot.rendered === false
       ? na(NOT_RENDERED_DETAIL)
       : check.run(ctx);
   const base = { id: check.id, category: check.category, title: check.title, weight, status: outcome.status, evidence: outcome.evidence };

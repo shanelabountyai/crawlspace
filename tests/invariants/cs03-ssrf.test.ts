@@ -47,15 +47,15 @@ describe("CS-03 SSRF guard", () => {
     ];
     for (const t of literals) await expect(crawlSite(t, { render: false }), t).rejects.toBeInstanceOf(SsrfError);
     for (const address of ["::ffff:0:7f00:1", "::ffff:0:808:808", "64:ff9b:1::7f00:1", "64:ff9b:1::808:808"]) {
-      let connects = 0;
+      let lookups = 0;
       const guard = {
         resolver: async () => {
-          connects++;
+          lookups++;
           return [address];
         },
       };
       await expect(crawlSite(`http://translated.example:${srv.port}/`, { render: false, guard }), address).rejects.toBeInstanceOf(SsrfError);
-      expect(connects, address).toBe(1); // resolved once for the pre-check, never again for a connection
+      expect(lookups, address).toBe(1); // resolved once for the pre-check and refused there: no second lookup for a connection
     }
     expect(srv.hits.length).toBe(before);
   });

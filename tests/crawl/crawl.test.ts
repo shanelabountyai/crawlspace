@@ -138,6 +138,36 @@ describe("robots.txt on a network error and after a cross-origin home redirect",
     expect(paths("f-dead.test")).toEqual(["/robots.txt"]);
   }, 30_000);
 
+  it("a moved site that redirects every path, robots.txt included, to a closed site's home page: the closed site gets no request other than /robots.txt", async () => {
+    const j = srv.site("j-closed.test", { "/robots.txt": closedRobots, "/": openHome });
+    const toHome = { status: 301, headers: { location: `${j}/` } };
+    const i = srv.site("i-moved.test", { "/robots.txt": toHome, "/": toHome });
+    const e = await refusal(`${i}/`);
+    expect(e.message).toContain(`j-closed.test:${srv.port}`);
+    expect(e.message).toMatch(/disallows CrawlspaceBot from \/; not scanning$/);
+    expect(paths("j-closed.test")).toEqual(["/robots.txt"]);
+    expect(paths("i-moved.test")).toEqual(["/robots.txt"]);
+  }, 30_000);
+
+  it("the same moved site pointing at an open site is scanned, and the open site's robots.txt is its first request", async () => {
+    const l = srv.site("l-open.test", { "/robots.txt": { type: "text/plain", body: "User-agent: *\nAllow: /\n" }, "/": openHome });
+    const toHome = { status: 301, headers: { location: `${l}/` } };
+    const k = srv.site("k-moved.test", { "/robots.txt": toHome, "/": toHome });
+    const { snapshot } = await crawlSite(`${k}/`, opts);
+    expect(snapshot.url).toBe(`${l}/`);
+    expect(paths("l-open.test")[0]).toBe("/robots.txt");
+    expect(paths("l-open.test").filter((p) => p === "/robots.txt")).toHaveLength(1);
+  }, 60_000);
+
+  it("two sites whose robots.txt files redirect into each other's pages are refused, not looped", async () => {
+    const mHost = `http://m-loop.test:${srv.port}`;
+    const n = srv.site("n-loop.test", { "/robots.txt": { status: 302, headers: { location: `${mHost}/page` } } });
+    srv.site("m-loop.test", { "/robots.txt": { status: 302, headers: { location: `${n}/page` } } });
+    const e = await refusal(`${mHost}/`);
+    expect(e.message).toMatch(/could not be read \(redirect loop between robots\.txt files\); treating as disallow-all and not scanning$/);
+    expect([...paths("m-loop.test"), ...paths("n-loop.test")].every((p) => p === "/robots.txt")).toBe(true);
+  }, 30_000);
+
   it("a redirect on the same origin into a disallowed path is refused before that path is requested", async () => {
     const base = srv.site("inward.test", {
       "/robots.txt": { type: "text/plain", body: "User-agent: *\nDisallow: /members/\n" },
@@ -198,6 +228,7 @@ describe("the crawl starts at the origin root", () => {
   it("pasting /nope-404-page on walledshop gives the same scorecard as /, and the 404 path is never requested", async () => {
     const root = await crawlSite(`${base}/`, { guard: testGuard });
     const deep = await crawlSite(`${base}/nope-404-page`, { guard: testGuard });
+    expect([root.snapshot.rendered, deep.snapshot.rendered]).toEqual([true, true]); // really rendered, so B and E are compared too
     expect(paths()).not.toContain("/nope-404-page");
     expect(deep.snapshot.url).toBe(`${base}/`);
     expect(deep.snapshot.pages.find((p) => p.kind === "home")?.url).toBe(`${base}/`);
@@ -267,9 +298,12 @@ describe("a home page that answers an error stops the scan", () => {
     expect(card.checks.find((c) => c.id === "A4")?.status).toBe("fail");
   }, 60_000);
 
-  it("a challenge page served with an error status is a wall, not a stop", async () => {
-    const base = srv.site("challenge.test", { "/": { status: 404, body: "<!doctype html><html><head><title>Just a moment...</title></head><body>Checking your browser</body></html>" } });
-    const { snapshot } = await crawlSite(`${base}/`, opts);
+  it("only the status decides: a 404 page that carries challenge-page markers is still an error page and stops", async () => {
+    const challenge = '<!doctype html><html><head><title>Just a moment...</title><script src="/cdn-cgi/challenge-platform/x.js"></script></head><body>Checking your browser</body></html>';
+    const gone = srv.site("challenge-404.test", { "/": { status: 404, body: challenge } });
+    await expect(crawlSite(`${gone}/`, opts)).rejects.toThrow(`the home page ${gone}/ answered HTTP 404; not scanning`);
+    const walled = srv.site("challenge-403.test", { "/": { status: 403, body: challenge } });
+    const { snapshot } = await crawlSite(`${walled}/`, opts);
     expect(scanSnapshot(snapshot, { agents: fixtureAgents() }).checks.find((c) => c.id === "A4")?.status).toBe("fail");
   }, 60_000);
 });

@@ -1,5 +1,5 @@
 import { isAllowed, robotsAccess, sitemapsFromRobots, type RobotsFetch, type RobotsGroup } from "../robots";
-import { wallReason } from "../checks/a4-no-bot-wall";
+import { WALL_STATUSES } from "../checks/a4-no-bot-wall";
 import { pathOf } from "../html";
 import { SnapshotSchema, type Page, type PageKind, type Resource, type Snapshot } from "../snapshot";
 import { MAX_KEY_PAGES, ROBOTS_TOKEN } from "./config";
@@ -38,12 +38,13 @@ export class CrawlRefused extends Error {
 
 /**
  * Accept "example.com" and "example.com:8443" as well as full URLs; only http(s). The input counts as having a scheme
- * only if it contains "://" or starts with http: / https:, so the "host:" of host:port is not read as one (PRD-02
- * requirement 7; review 2026-11-20, UX-5). Anything else gets https:// and is then vetted by `parseTarget`.
+ * only if it starts with one followed by "://" or starts with http: / https:, so the "host:" of host:port is not read
+ * as one (PRD-02 requirement 7; review 2026-11-20, UX-5). A "://" further in, as in "shop.example/go?to=https://x", is
+ * part of the address, not a scheme (D-125). Anything else gets https:// and is then vetted by `parseTarget`.
  */
 export function normaliseStartUrl(input: string): string {
   const trimmed = input.trim();
-  const hasScheme = trimmed.includes("://") || /^https?:/i.test(trimmed);
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^https?:/i.test(trimmed);
   const withScheme = hasScheme ? trimmed : `https://${trimmed}`;
   const url = parseTarget(withScheme);
   url.hash = "";
@@ -91,18 +92,32 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
       label: string;
     }
     const robotsByOrigin = new Map<string, OriginRobots>();
+    const reading = new Set<string>();
     const robotsFor = async (origin: string): Promise<OriginRobots> => {
       const known = robotsByOrigin.get(origin);
       if (known) return known;
       const url = `${origin}/robots.txt`;
       const label = origin === origin0 ? "robots.txt" : `robots.txt on ${new URL(origin).host} (the home page redirects there)`;
+      // Two robots.txt files that redirect into each other's sites: neither can be read.
+      if (reading.has(origin)) throw new CrawlRefused(`${label} could not be read (redirect loop between robots.txt files); treating as disallow-all and not scanning`);
       let res: FetchResult | null = null;
       let fetched: RobotsFetch;
+      reading.add(origin);
       try {
-        res = await fetcher.get(url, "page");
+        // A robots.txt may itself redirect. A hop on the same origin, or to another origin's /robots.txt, is followed;
+        // a hop to any other path on another origin (a moved site sending every path to its new home page) is a
+        // request to that origin like any other, so that origin's robots.txt is read and applied first (D-125).
+        const beforeRedirect = async (hop: string): Promise<void> => {
+          const h = new URL(hop);
+          if (h.origin !== origin && h.pathname !== "/robots.txt") await assertRobotsAllow(hop);
+        };
+        res = await fetcher.get(url, "page", { beforeRedirect });
         fetched = { status: res.status, body: res.body };
       } catch (e) {
+        if (e instanceof CrawlRefused) throw e;
         fetched = { error: errText(e) };
+      } finally {
+        reading.delete(origin);
       }
       // RFC 9309: 4xx = no rules; 5xx or unreachable = treat as "disallow all", so we do not scan (D-24, Decision 10a).
       const access = robotsAccess(fetched);
@@ -125,9 +140,10 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
     const home = homeRes.url;
     const origin = new URL(home).origin;
     // A home page that answers 4xx/5xx is an error page, not the site: stop instead of scoring it (PRD-02 requirement 5;
-    // Decision 3c). The exception is what A4 already reports as a bot wall (401/403/429/503 or a challenge page): that
-    // is what an agent meets too, so it stays a finding on a finished report (D-15).
-    if (homeRes.status >= 400 && wallReason({ status: homeRes.status, rawHtml: homeRes.body }) === null) {
+    // Decision 3c). The exception is the statuses A4 reports as a bot wall (401, 403, 429, 503): that is what an agent
+    // meets too, so it stays a finding on a finished report (D-15). Only the status decides: an ordinary 404 or 500
+    // page that happens to carry a challenge script is still an error page (D-121).
+    if (homeRes.status >= 400 && !WALL_STATUSES.has(homeRes.status)) {
       throw new CrawlRefused(`the home page ${home} answered HTTP ${homeRes.status}; not scanning`);
     }
     if (origin !== origin0) report.notes.push(`home redirected to ${origin}; using its robots.txt`);
