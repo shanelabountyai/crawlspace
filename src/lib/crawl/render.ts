@@ -17,7 +17,10 @@ export interface Renderer {
   close(): Promise<void>;
 }
 
-/** Fallback when rendering is switched off: the rendered view equals the raw HTML. */
+/**
+ * Used when rendering is switched off: the "rendered" view is only the raw HTML, so the crawl marks the snapshot as
+ * not rendered (PRD-02 requirement 6).
+ */
 export class NoRenderer implements Renderer {
   readonly events: RenderEvent[] = [];
   async render(main: FetchResult): Promise<string> {

@@ -20,6 +20,8 @@ export interface CrawlReport {
   renderEvents: RenderEvent[];
   skipped: { url: string; reason: string }[];
   notes: string[];
+  /** False when any page could not be rendered or rendering was switched off; same value as `snapshot.rendered`. */
+  rendered: boolean;
 }
 
 export interface CrawlResult {
@@ -61,8 +63,9 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
   const startUrl = `${new URL(enteredUrl).origin}/`;
 
   const fetcher = new Fetcher(opts);
-  const renderer = opts.renderer ? opts.renderer(fetcher) : opts.render === false ? new NoRenderer() : new PlaywrightRenderer(fetcher);
-  const report: CrawlReport = { requests: fetcher.log, renderEvents: renderer.events, skipped: [], notes: [] };
+  const renderOff = !opts.renderer && opts.render === false;
+  const renderer = opts.renderer ? opts.renderer(fetcher) : renderOff ? new NoRenderer() : new PlaywrightRenderer(fetcher);
+  const report: CrawlReport = { requests: fetcher.log, renderEvents: renderer.events, skipped: [], notes: [], rendered: !renderOff };
   const fetchedAt = new Date().toISOString();
 
   const tryGet = async (url: string, why: string, options?: GetOptions): Promise<FetchResult | null> => {
@@ -178,11 +181,13 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
     // 7. render every fetched page (document served from the bytes already downloaded)
     const pages: Page[] = [];
     const counts = new Map<string, number>();
+    let renderFailures = 0;
     for (const { res, kind } of fetched) {
       let rendered = res.body;
       try {
         rendered = await renderer.render(res);
       } catch (e) {
+        renderFailures++;
         report.notes.push(`render of ${res.url} failed, using raw HTML: ${errText(e)}`);
       }
       const n = (counts.get(kind) ?? 0) + 1;
@@ -190,7 +195,16 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
       pages.push({ id: kind === "home" ? "home" : `${kind}-${n}`, url: res.url, kind, status: res.status, ttfbMs: res.ttfbMs, rawHtml: res.body, renderedHtml: rendered });
     }
 
-    const snapshot = SnapshotSchema.parse({ url: home, fetchedAt, siteTypeOverride: null, robots, sitemap, llms, pages });
+    // A page whose "rendered" HTML is only its raw HTML must not be scored as if it had been rendered (PRD-02
+    // requirement 6; review 2026-11-20, CQ-3): the flag makes the rendered-view checks N/A, and the note says why.
+    const naNote = "the checks that need the rendered page (categories B and E) are marked not applicable";
+    if (renderOff) report.notes.push(`rendering was switched off; ${naNote}`);
+    else if (renderFailures > 0) {
+      report.rendered = false;
+      report.notes.push(`rendering failed for ${renderFailures} of ${fetched.length} pages; ${naNote}`);
+    }
+
+    const snapshot = SnapshotSchema.parse({ url: home, fetchedAt, siteTypeOverride: null, robots, sitemap, llms, pages, rendered: report.rendered });
     return { snapshot, report };
   } finally {
     await renderer.close();

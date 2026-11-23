@@ -9,6 +9,7 @@ export const e3GuestPath: CheckDefinition = {
   title: "Guest path exists without a forced account",
   label: "heuristic",
   appliesTo: ["ecommerce", "event"],
+  needsRendered: true,
   run({ actionPages }) {
     if (actionPages.length === 0) return { status: "not-applicable", evidence: [{ detail: "no cart or registration page captured" }] };
     const evidence: Evidence[] = [];

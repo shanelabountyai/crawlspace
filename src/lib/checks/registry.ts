@@ -33,13 +33,23 @@ export function applies(check: CheckDefinition, siteType: SiteType): boolean {
   return check.appliesTo === "all" || check.appliesTo.includes(siteType);
 }
 
-/** Run one check against a context; adds id/category/title/weight and applies site-type N/A. */
+/** Evidence on a rendered-view check when the snapshot's pages were not rendered (PRD-02 requirement 6). */
+export const NOT_RENDERED_DETAIL = "page could not be rendered";
+
+/**
+ * Run one check against a context; adds id/category/title/weight and applies the two N/A rules: the check does not
+ * apply to the site type, or it reads the rendered view and the pages were not rendered. N/A never changes the
+ * score (CS-05).
+ */
 export function runCheck(check: CheckDefinition, ctx: CheckContext, weights: Weights): CheckResult {
   const weight = weights.checks[check.id];
   if (weight === undefined) throw new Error(`rules/weights.json has no weight for ${check.id}`);
-  const outcome = applies(check, ctx.siteType)
-    ? check.run(ctx)
-    : { status: "not-applicable" as const, evidence: [{ detail: `does not apply to site type '${ctx.siteType}'` }] };
+  const na = (detail: string) => ({ status: "not-applicable" as const, evidence: [{ detail }] });
+  const outcome = !applies(check, ctx.siteType)
+    ? na(`does not apply to site type '${ctx.siteType}'`)
+    : check.needsRendered && !ctx.snapshot.rendered
+      ? na(NOT_RENDERED_DETAIL)
+      : check.run(ctx);
   const base = { id: check.id, category: check.category, title: check.title, weight, status: outcome.status, evidence: outcome.evidence };
   return check.label ? { ...base, label: check.label } : base;
 }

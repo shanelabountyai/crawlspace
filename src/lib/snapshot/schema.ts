@@ -41,6 +41,13 @@ export const SnapshotSchema = z
     sitemap: ResourceSchema.nullable(),
     llms: ResourceSchema.nullable(),
     pages: z.array(PageSchema).min(1),
+    /**
+     * False when any page's `renderedHtml` is not a real rendering (the headless browser failed, or rendering was
+     * switched off) and is only a copy of `rawHtml`. The checks that read the rendered view then return N/A instead
+     * of judging raw HTML as if it had been rendered (PRD-02 requirement 6). Absent = true, so snapshots stored
+     * before the flag existed, and every committed fixture, read as rendered.
+     */
+    rendered: z.boolean().default(true),
   })
   .strict()
   .superRefine((s, ctx) => {
@@ -71,6 +78,8 @@ export const ManifestSchema = z
     robots: ManifestResourceSchema.nullable(),
     sitemap: ManifestResourceSchema.nullable(),
     llms: ManifestResourceSchema.nullable(),
+    /** See `SnapshotSchema.rendered`. Written only when false, so manifests of rendered snapshots are unchanged. */
+    rendered: z.boolean().default(true),
     pages: z
       .array(
         z

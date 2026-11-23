@@ -41,6 +41,11 @@ export interface CheckDefinition {
   /** Shown next to the result so readers know how much to trust it. */
   label?: "heuristic" | "proposed convention";
   appliesTo: readonly SiteType[] | "all";
+  /**
+   * The check reads the rendered view (D-14: all of E, and B's raw-versus-rendered comparison). On a snapshot whose
+   * pages were not rendered it is not run and returns N/A, "page could not be rendered" (PRD-02 requirement 6).
+   */
+  needsRendered?: boolean;
   run(ctx: CheckContext): CheckOutcome;
 }
 

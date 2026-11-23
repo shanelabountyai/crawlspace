@@ -13,6 +13,7 @@ export const e4CaptchaFirstStep: CheckDefinition = {
   category: "E",
   title: "No CAPTCHA on the first cart/registration step",
   appliesTo: ["ecommerce", "event"],
+  needsRendered: true,
   run({ actionPages }) {
     if (actionPages.length === 0) return { status: "not-applicable", evidence: [{ detail: "no cart or registration page captured" }] };
     const evidence: Evidence[] = [];
