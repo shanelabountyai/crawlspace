@@ -1,5 +1,52 @@
 # Crawlspace — next
 
+## PRD-01 Phase A: headless browser isolation (scheduled run, 2026-11-22, branch `prd-01/browser-isolation`)
+
+One draft PR, #16 ("Crawlspace: PRD-01 Phase A, headless browser isolation"), not merged. **Nothing was deployed**; no
+Render, Cloudflare, Vercel or HubSpot setting, environment variable or secret was touched. Main was at 358a5ba (not
+moved). Phase B not started (Decision 9b).
+
+- **Env (req. 1, D-109):** Chromium now gets only `HOME`, `PATH`, `TZ`, `LANG`, `LC_ALL`, `TMPDIR`,
+  `PLAYWRIGHT_BROWSERS_PATH`. On main the real Chromium processes carried the dummy secrets
+  (`tests/crawl/render-env.test.ts`: 6/6 failed on main, 6/6 pass).
+- **Read-only `/app` (req. 2, D-110):** installed and built as root; only `/data` is `node`'s; the build fails if
+  `node` could write under `/app`. CI smoke step 8: every create/write under `/app` refused, no `EACCES` in the log.
+  Open question 2 answered: Next did not need `.next/cache` writable (CI smoke; local e2e 23/23 with the server as a
+  non-root user).
+- **Sandbox (req. 3, D-108):** tried first; if refused, today's `--no-sandbox` launch and one log line. **CI's `docker`
+  job refused it:** `FATAL:...zygote_host_impl_linux.cc:129] No usable sandbox!` (no user namespaces for the app
+  user). So `--no-sandbox` stays in effect there. Render: not verified. Locally, as an unprivileged user, it ran ON.
+- **No secret through Chromium (acc. 3, D-112):** CI smoke step 9 (dummy secrets only): no secret in the rendered page
+  or in any of 5 Chromium process environments.
+- **Fix-forward (req. 4, D-111):** `docs/DEPLOY.md` records Playwright 1.63.0 / Chromium 153.0.8010.12; npm's latest
+  is 1.65.1; not bumped here.
+- **Gate before (main, 358a5ba):** `npm ci` 0, lint 0, typecheck 0, `npm test` 520/520 (30 files), build 0,
+  `npm run e2e` 23/23, base-path build 0, `npm run e2e:base-path` 4/4.
+- **Gate after (branch):** `npm ci` 0, lint 0, typecheck 0, `npm test` 531/531 (32 files), build 0, `npm run e2e`
+  23/23, base-path build 0, `npm run e2e:base-path` 4/4. CI: `check` and `docker` success on 9d34fb4; `docker`
+  success on 0237c0a. Final CI results are in the PR body.
+- **Residual risk, measured (D-112):** in CI's image the server's `/proc/<pid>/environ` is readable by `node`. With the
+  sandbox refused, native code in a compromised renderer (needs a Chromium exploit) could still read it and `/data`.
+  That is Phase B. Page JS cannot (blocked by interception; checked).
+- **Not verified:** anything on Render (sandbox, launch, memory); the Docker build locally (D-71).
+- **Overnight review (comment on #16):** 0 must-fix, 3 should-fix, 4 nits. Fixed the sticky fallback and its missing
+  test (D-114), this step-3 wording, the D-108 count and one nit (Dockerfile `-print`). Gate after: see the PR body.
+
+**Your hand steps, in order:**
+
+1. You: review draft PR #16; merge it once `check` and `docker` are green. Claude does not merge.
+2. You: start a manual deploy on Render (auto-deploy is off), then the smoke test from `docs/DEPLOY.md` (owner's
+   steps 6-7): health route, one full scan of a site you own that needs JavaScript, its PDF, restart, reopen.
+3. You: in Render's logs after that scan, look for `crawlspace: Chromium sandbox refused, rendering with --no-sandbox`.
+   Present = Render has no user namespaces either; scans still work as before and Phase B (Decision 9b) is the next
+   step. Absent **and** the scan rendered = the sandbox is on; absent with no rendered scan tells you nothing. A line
+   `sandboxed Chromium launch failed for another reason` is not a refusal (D-114). Details: `docs/DEPLOY.md`
+   "Headless browser isolation", "On Render after deploying this".
+4. If Chromium fails to launch on Render (scans fail; `browserType.launch` errors in the log), or the log shows
+   `EACCES`/`EROFS`: roll back to the previous deploy in Render's dashboard and send the log lines
+   (`docs/DEPLOY.md` "Headless browser isolation").
+5. You, later: a Playwright bump to a current release (1.65.1 seen on 2026-11-22) as its own PR (D-111).
+
 ## PDF panel move + opt-in base path for assess hosting (scheduled run, 2026-11-21, branch `leadmagnet/2026-11-21`)
 
 One draft PR ("Crawlspace: PDF panel after "Fix these first" + opt-in base path for assess hosting"), not merged.

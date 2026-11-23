@@ -11,7 +11,7 @@ The owner's steps are under [Render](#render-chosen-host-d-65).
 | Need | Why | Where in the code |
 |---|---|---|
 | Node 22 | `engines` in `package.json` | — |
-| Chromium for Playwright 1.63.0 (`npx playwright install --with-deps chromium`) | the "readable without JS" and actionability checks render pages (D-02); Chromium never touches the network itself (D-20) | `src/lib/crawl/render.ts` |
+| Chromium for Playwright 1.63.0 (`npx playwright install --with-deps chromium`; Chromium 153.0.8010.12 in the image, 2026-11-22) | the "readable without JS" and actionability checks render pages (D-02); Chromium never touches the network itself (D-20) and gets no app secret (PRD-01, D-109) | `src/lib/crawl/render.ts` |
 | Direct outbound HTTP(S) on any port | the crawler connects directly and ignores `HTTPS_PROXY`, so the SSRF guard sees the real destination (D-22) | `src/lib/crawl/fetcher.ts`, `ssrf.ts` |
 | A writable, persistent file for SQLite | scans, reports and leads (D-03); migrations run on start (D-26) | `DATABASE_FILE`, `src/server/db.ts` |
 | **One** app process | the scan queue, the login limiter and the PDF-gate limiter live in memory (D-29, D-38, D-39); two processes would each run their own queue against one SQLite file | `src/server/scan-service.ts` |
@@ -248,6 +248,46 @@ Each of these is a "check it on the day" item, not a known problem.
     the app's port can be reached without passing Render's proxy. Render's docs read in these runs do not say (D-78).
     Until step 8's check is done, `CRAWLSPACE_TRUSTED_PROXY_HOPS` stays empty and the sign-in limit is shared by all
     addresses.
+
+## Headless browser isolation (PRD-01 Phase A, D-108 to D-111)
+
+Added 2026-11-22. Nothing deployed. What changed in how Chromium and the image run, and what to look for on Render.
+
+**Versions (fix-forward note, PRD-01 requirement 4).** `playwright` and `@playwright/test` are pinned at **1.63.0**
+(`package.json`); the image's Chromium for it reported **153.0.8010.12** in CI's `docker` job on 2026-11-22. npm's
+latest release that day was 1.65.1 (checked with `npm view playwright version`). Chromium renders pages chosen by
+anonymous visitors, so keep Playwright on a current release: bump both packages together in their own small PR, let
+CI's `check` and `docker` jobs run, then update the two numbers here. Not bumped in the PRD-01 run (D-111).
+
+**What the browser gets.**
+
+1. **Environment:** only `HOME`, `PATH`, `TZ`, `LANG`, `LC_ALL`, `TMPDIR` and `PLAYWRIGHT_BROWSERS_PATH`, when set
+   (`CHROMIUM_ENV_ALLOWLIST` in `src/lib/crawl/render.ts`). No `ANTHROPIC_API_KEY`, `CRAWLSPACE_*`, `HUBSPOT_*` or
+   `DATABASE_FILE` (D-109). Before this change Chromium inherited the server's whole environment.
+2. **Sandbox:** the renderer first launches Chromium with its own sandbox. If the host refuses, it launches as before
+   with `--no-sandbox` and logs one line (D-108):
+   `crawlspace: Chromium sandbox refused, rendering with --no-sandbox (PRD-01 Phase A, D-108): <Chromium's error>`.
+   In CI's `docker` job the sandbox was refused with Chromium's `No usable sandbox!` (the host does not give the
+   unprivileged user the user namespaces it needs). Render: not verified. Either way scans keep working.
+3. **`/app` is read-only for `node`:** dependencies, Chromium and the build are installed as root; only `/data` (the
+   database's directory) belongs to `node`. The build fails if anything under `/app` is owned by `node` or
+   world-writable; `scripts/docker-smoke.sh` step 8 checks it in the running container (D-110). If `DATABASE_FILE` is
+   left unset, the entrypoint's default `/app/data` is made writable for `node` as before (D-67); `render.yaml` sets
+   `/data/crawlspace.db`.
+
+**On Render after deploying this (your smoke test, steps 6-7 above):**
+
+- Look in the service's logs for the `Chromium sandbox refused` line after the first scan. It shows once per process.
+  Present: Render gives no user namespaces, the browser runs as it did before this change (env and `/app` still
+  isolated); PRD-01 Phase B is the next step. Absent, and the scan rendered: the sandbox is on. A different line,
+  `sandboxed Chromium launch failed for another reason`, means that one launch failed for something other than the
+  sandbox (timeout, memory) and the next launch tries the sandbox again (D-114); if it shows on every scan, send it.
+- If scans fail and the logs show a Chromium launch error **without** that line, or `browserType.launch` errors after
+  it: the unsandboxed fallback also failed; that is not expected from this change (its launch options are the ones
+  used before, plus the smaller env). Roll back to the previous deploy in Render's dashboard and send the log lines.
+- If the logs show `EACCES` or `EROFS`: something tried to write under `/app` at runtime (CI and a local run saw none,
+  D-110). Roll back and send the log lines.
+- A scan of a site that needs JavaScript must still show rendered B and E results, as in the 2026-11-20 smoke test.
 
 ## Serving at a path (D-103 to D-106)
 

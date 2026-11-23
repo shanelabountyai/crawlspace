@@ -1,6 +1,6 @@
 # PRD-01 — Headless browser isolation
 
-Status: **Proposed** (2026-11-20). Source: `docs/REVIEW-2026-11-20.md` rank 14 (SEC-2); owner Decision 9: (a) now,
+Status: **Phase A built (draft PR)** (2026-11-22, branch `prd-01/browser-isolation`, D-108 to D-113; proposed 2026-11-20). Phase B not started. Source: `docs/REVIEW-2026-11-20.md` rank 14 (SEC-2); owner Decision 9: (a) now,
 (b) only if (a)'s sandbox cannot run on Render. Rank 2 (SEC-1, WebRTC/UDP) is **done** in draft PR #12
 (`fix/webrtc-guard`, D-100: `disable_non_proxied_udp` + init script removing the RTC constructors, test
 `tests/invariants/cs03-webrtc.test.ts`); it is not part of this PRD.

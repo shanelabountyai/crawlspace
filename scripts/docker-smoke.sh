@@ -4,6 +4,8 @@
 # Starts the container the way Render does (PORT set by the platform, a volume mounted at /data,
 # DATABASE_FILE on it), then fails unless the health route and the home page both answer 200.
 # It makes no outbound request: the only scan it submits is one the SSRF guard refuses.
+# Steps 8-9 are PRD-01 Phase A (browser isolation): /app is read-only for `node`, and Chromium gets no secret. The
+# container gets DUMMY secret values for that check; no real secret is ever used here.
 set -euo pipefail
 
 image="${1:?usage: docker-smoke.sh <image>}"
@@ -44,8 +46,16 @@ docker run --rm --entrypoint node "$image" -e '
   if (major !== 22) { console.error("node " + process.version); process.exit(1); }
 '
 
-echo "3. Start the container: PORT=${port}, DATABASE_FILE on a mounted volume"
-docker run -d --name "$name" -e PORT="$port" -e DATABASE_FILE=/data/crawlspace.db -v "$data:/data" -p "127.0.0.1:${port}:${port}" "$image" >/dev/null
+# Dummy values only (PRD-01 acceptance 3): they must never show up in Chromium's environment or a rendered page.
+dummy_secrets=(
+  -e ANTHROPIC_API_KEY=smoke-dummy-anthropic-not-a-key
+  -e CRAWLSPACE_OPERATOR_PASSWORD=smoke-dummy-operator-password
+  -e HUBSPOT_PORTAL_ID=smoke-dummy-portal-id
+  -e HUBSPOT_FORM_GUID=smoke-dummy-form-guid
+)
+
+echo "3. Start the container: PORT=${port}, DATABASE_FILE on a mounted volume, dummy secrets set"
+docker run -d --name "$name" -e PORT="$port" -e DATABASE_FILE=/data/crawlspace.db "${dummy_secrets[@]}" -v "$data:/data" -p "127.0.0.1:${port}:${port}" "$image" >/dev/null
 
 echo "4. Wait for the health route"
 code=000
@@ -76,5 +86,26 @@ code="$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'content-type: applica
 [ "$code" = "400" ] || { echo "a loopback scan answered $code, wanted 400 (SSRF guard)"; exit 1; }
 docker exec "$name" test -s /data/crawlspace.db || { echo "/data/crawlspace.db was not created on the volume"; exit 1; }
 echo "   POST /api/scans (loopback) -> 400, /data/crawlspace.db exists"
+
+echo "8. The app user cannot create or modify a file under /app (PRD-01 acceptance 2)"
+docker exec -u node "$name" sh -c '
+  fail=0
+  for d in /app /app/.next /app/.next/server /app/.next/static /app/.next/cache /app/node_modules /app/node_modules/next /app/node_modules/playwright /app/src /app/scripts /app/prisma; do
+    [ -d "$d" ] || continue
+    if touch "$d/.smoke-write-test" 2>/dev/null; then echo "   node created $d/.smoke-write-test"; fail=1; else echo "   create in $d: refused"; fi
+  done
+  for f in /app/package.json /app/.next/BUILD_ID /app/scripts/docker-entrypoint.sh /app/node_modules/next/package.json; do
+    [ -f "$f" ] || continue
+    if ( : >> "$f" ) 2>/dev/null; then echo "   node opened $f for writing"; fail=1; else echo "   write to $f: refused"; fi
+  done
+  writable="$(find /app -xdev ! -type l \( -user node -o -perm -o+w \) 2>/dev/null | head -n 5)"
+  if [ -n "$writable" ]; then echo "   owned by node or world-writable under /app:"; echo "$writable"; fail=1; fi
+  exit $fail
+' || { echo "node can write under /app"; exit 1; }
+if docker logs "$name" 2>&1 | grep -E "EACCES|EROFS"; then echo "the app tried to write somewhere it may not (above)"; exit 1; fi
+echo "   no write error in the app log after the requests above"
+
+echo "9. Chromium gets no secret; sandbox outcome recorded (PRD-01 acceptance 3 and 4)"
+docker exec -u node -e HOME=/home/node -w /app "$name" node_modules/.bin/tsx scripts/render-isolation-smoke.ts
 
 echo "docker smoke: ok"
