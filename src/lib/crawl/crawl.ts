@@ -1,4 +1,4 @@
-import { isAllowed, parseRobots, sitemapsFromRobots, type RobotsGroup } from "../robots";
+import { isAllowed, robotsAccess, sitemapsFromRobots, type RobotsFetch, type RobotsGroup } from "../robots";
 import { pathOf } from "../html";
 import { SnapshotSchema, type Page, type PageKind, type Resource, type Snapshot } from "../snapshot";
 import { MAX_KEY_PAGES, ROBOTS_TOKEN } from "./config";
@@ -74,27 +74,50 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
   const resource = (url: string, r: FetchResult | null): Resource => ({ url, status: r?.status ?? 0, body: r && r.status === 200 ? r.body : null });
 
   try {
-    // 1. robots.txt for our own user agent
+    // 1. robots.txt for our own user agent. Each origin's file is read once, before anything else is fetched there.
     const origin0 = new URL(startUrl).origin;
-    const robotsRes = await tryGet(`${origin0}/robots.txt`, "robots.txt");
-    // RFC 9309: 4xx = no rules; 5xx = treat as "disallow all", so we do not scan.
-    if (robotsRes && robotsRes.status >= 500) throw new CrawlRefused(`robots.txt returned ${robotsRes.status}; treating as disallow-all and not scanning`);
-    let groups: RobotsGroup[] = robotsRes && robotsRes.status === 200 ? parseRobots(robotsRes.body) : [];
-    const allowed = (url: string) => isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed;
-    if (!allowed(startUrl)) throw new CrawlRefused(`robots.txt disallows ${ROBOTS_TOKEN} from ${pathOf(startUrl)}; not scanning`);
+    interface OriginRobots {
+      resource: Resource;
+      groups: RobotsGroup[];
+      /** How messages name this file: "robots.txt" for the origin that was entered. */
+      label: string;
+    }
+    const robotsByOrigin = new Map<string, OriginRobots>();
+    const robotsFor = async (origin: string): Promise<OriginRobots> => {
+      const known = robotsByOrigin.get(origin);
+      if (known) return known;
+      const url = `${origin}/robots.txt`;
+      const label = origin === origin0 ? "robots.txt" : `robots.txt on ${new URL(origin).host} (the home page redirects there)`;
+      let res: FetchResult | null = null;
+      let fetched: RobotsFetch;
+      try {
+        res = await fetcher.get(url, "page");
+        fetched = { status: res.status, body: res.body };
+      } catch (e) {
+        fetched = { error: errText(e) };
+      }
+      // RFC 9309: 4xx = no rules; 5xx or unreachable = treat as "disallow all", so we do not scan (D-24, Decision 10a).
+      const access = robotsAccess(fetched);
+      if (!access.ok) throw new CrawlRefused(`${label} ${access.why}; treating as disallow-all and not scanning`);
+      const entry: OriginRobots = { resource: resource(url, res), groups: access.groups, label };
+      robotsByOrigin.set(origin, entry);
+      return entry;
+    };
+    /** Throws CrawlRefused unless the URL's origin has a readable robots.txt that lets CrawlspaceBot fetch it. */
+    const assertRobotsAllow = async (url: string): Promise<void> => {
+      const { groups, label } = await robotsFor(new URL(url).origin);
+      if (!isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed) throw new CrawlRefused(`${label} disallows ${ROBOTS_TOKEN} from ${pathOf(url)}; not scanning`);
+    };
+    await assertRobotsAllow(startUrl);
 
     // 2. home page (follows redirects; the final URL defines the site)
     const homeRes = await tryGet(startUrl, "home page");
     if (!homeRes) throw new CrawlRefused(`could not fetch the home page: ${report.notes.at(-1) ?? report.skipped.at(-1)?.reason ?? "unknown error"}`);
     const home = homeRes.url;
     const origin = new URL(home).origin;
-    let robots = resource(`${origin0}/robots.txt`, robotsRes);
-    if (origin !== origin0) {
-      report.notes.push(`home redirected to ${origin}; using its robots.txt`);
-      const r2 = await tryGet(`${origin}/robots.txt`, "robots.txt");
-      robots = resource(`${origin}/robots.txt`, r2);
-      groups = r2 && r2.status === 200 ? parseRobots(r2.body) : [];
-    }
+    if (origin !== origin0) report.notes.push(`home redirected to ${origin}; using its robots.txt`);
+    const { resource: robots, groups } = await robotsFor(origin);
+    const allowed = (url: string) => isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed;
 
     // 3. sitemap (robots.txt pointer first, then /sitemap.xml; one level of sitemap index)
     const pointed = robots.body ? sitemapsFromRobots(robots.body).find((u) => sameSite(u, home)) : undefined;

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { crawlSite, type CrawlResult } from "@/lib/crawl";
+import { CrawlRefused, crawlSite, type CrawlResult } from "@/lib/crawl";
 import { fixtureAgents } from "@/lib/fixtures";
 import { scanSnapshot } from "@/lib/scan";
 import { loadSnapshotFromDir, writeSnapshotToDir } from "@/lib/snapshot";
@@ -72,4 +72,41 @@ document.head.appendChild(s);`;
     writeSnapshotToDir(shop.snapshot, dir);
     expect(loadSnapshotFromDir(dir)).toEqual(shop.snapshot);
   });
+});
+
+// PRD-02 requirements 1 and 2 (review 2026-11-20, CQ-2 and CQ-9; D-24 extended; Decision 10a).
+describe("robots.txt on a network error and after a cross-origin home redirect", () => {
+  let srv: SiteServer;
+  const opts = { guard: testGuard, render: false } as const;
+  const paths = (host: string) => srv.hits.filter((h) => h.host === host).map((h) => h.path);
+  const refusal = async (url: string): Promise<CrawlRefused> => {
+    const e = await crawlSite(url, opts).then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e, url).toBeInstanceOf(CrawlRefused);
+    return e as CrawlRefused;
+  };
+  const closedRobots = { type: "text/plain", body: "User-agent: *\nDisallow: /\n" };
+  const openHome = { body: "<!doctype html><html><head><title>Home</title></head><body><h1>Home</h1></body></html>" };
+
+  beforeAll(async () => {
+    srv = await new SiteServer().start();
+  });
+  afterAll(async () => {
+    await srv.stop();
+  });
+
+  it("a robots.txt that cannot be read (connection closed) stops the scan: nothing else is requested", async () => {
+    const base = srv.site("robots-dead.test", { "/robots.txt": { destroy: true }, "/": openHome });
+    const e = await refusal(`${base}/`);
+    expect(e.message).toMatch(/^robots\.txt could not be read \(.+\); treating as disallow-all and not scanning$/);
+    expect(paths("robots-dead.test")).toEqual(["/robots.txt"]);
+  }, 30_000);
+
+  it("a robots.txt on a host that refuses connections stops the scan", async () => {
+    // Port 1 on loopback: nothing listens there, so the connect itself fails.
+    const e = await refusal("http://robots-unreachable.test:1/");
+    expect(e.message).toMatch(/^robots\.txt could not be read \(.+\); treating as disallow-all and not scanning$/);
+  }, 30_000);
 });
