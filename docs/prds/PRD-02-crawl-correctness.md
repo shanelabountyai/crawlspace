@@ -70,7 +70,7 @@ bands, the UI note for deep links (PRD-04), abuse limits (PRD-03).
 
 ## 7. Dependencies
 
-- Shane's OK on scoring-adjacent behaviour (requirements 4-6).
+- Shane's OK on scoring-adjacent behaviour (requirements 4-6). **Met:** given 2026-11-23 in chat (D-115).
 - Review rank 1 (live smoke test) shows whether requirement 6 already affects live reports.
 - PRD-01 and PR #12 also touch `render.ts`: merge order PR #12 → PRD-01 → PRD-02, or one branch.
 - PRD-04 owns the wording of the new stop reasons (proposed, Shane edits).
