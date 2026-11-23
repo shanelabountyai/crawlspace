@@ -33,6 +33,31 @@ describe("CS-02 politeness", () => {
     for (const g of gaps(hits)) expect(g).toBeGreaterThanOrEqual(MIN_INTERVAL_MS - 50);
   }, 60_000);
 
+  // PRD-02 requirement 3 (review 2026-11-20, CQ-8): the 1 req/s limit is per host for the whole process, not per scan.
+  it("two scans of one host started together: every request start is ≥ 1 s after the previous one, across both scans", async () => {
+    const base = srv.site("twice.test", {
+      "/robots.txt": { type: "text/plain", body: "User-agent: *\nAllow: /\n" },
+      "/": { body: "<!doctype html><html><head><title>Twice</title></head><body><h1>Twice</h1></body></html>" },
+    });
+    const [a, b] = await Promise.all([crawlSite(`${base}/`, { guard: testGuard, render: false }), crawlSite(`${base}/`, { guard: testGuard, render: false })]);
+    expect(a.report.requests.length).toBeGreaterThanOrEqual(3);
+    expect(b.report.requests.length).toBeGreaterThanOrEqual(3);
+    const starts = [...a.report.requests, ...b.report.requests].map((r) => r.startedAt).sort((x, y) => x - y);
+    for (let i = 1; i < starts.length; i++) expect(starts[i]! - starts[i - 1]!, `logged start ${i}`).toBeGreaterThanOrEqual(MIN_INTERVAL_MS);
+    const hits = srv.hits.filter((h) => h.host === "twice.test");
+    expect(hits.length).toBe(starts.length);
+    for (const g of gaps(hits)) expect(g).toBeGreaterThanOrEqual(MIN_INTERVAL_MS - 50);
+  }, 60_000);
+
+  it("a second scan of a host started right after the first still waits out the interval", async () => {
+    const base = srv.site("backtoback.test", { "/": { body: "<h1>Home</h1>" } });
+    const first = await crawlSite(`${base}/`, { guard: testGuard, render: false });
+    const second = await crawlSite(`${base}/`, { guard: testGuard, render: false });
+    const lastOfFirst = Math.max(...first.report.requests.map((r) => r.startedAt));
+    const firstOfSecond = Math.min(...second.report.requests.map((r) => r.startedAt));
+    expect(firstOfSecond - lastOfFirst).toBeGreaterThanOrEqual(MIN_INTERVAL_MS);
+  }, 60_000);
+
   it("a huge site with forms and POSTing scripts: still GET only and capped at 15 pages", async () => {
     const products = Array.from({ length: 80 }, (_, i) => `/products/p${i}`);
     const productPage = `<!doctype html><html><head><title>P</title></head><body><h1>Thing</h1><p>$5.00</p>

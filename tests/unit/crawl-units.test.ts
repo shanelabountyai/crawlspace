@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { isPublicAddress, normaliseStartUrl } from "@/lib/crawl";
 import { extractLinks, findActionLink, guessSiteType, parseSitemap, pickKeyPages, sameSite } from "@/lib/crawl/discover";
-import { HostRateLimiter, type Clock } from "@/lib/crawl/ratelimit";
+import { Fetcher } from "@/lib/crawl";
+import { HostRateLimiter, LIMITER_SWEEP_AT, sharedHostRateLimiter, type Clock } from "@/lib/crawl/ratelimit";
 import { sitemapsFromRobots } from "@/lib/robots";
 
 describe("isPublicAddress", () => {
@@ -56,6 +57,40 @@ describe("HostRateLimiter", () => {
     const starts: number[] = [];
     await Promise.all([1, 2, 3, 4].map(() => rl.acquire("a.example").then(() => starts.push(clock.now()))));
     expect(starts).toEqual([0, 1000, 2000, 3000]);
+  });
+  // PRD-02 requirement 3: one limiter for the whole process.
+  it("every fetcher shares the process-wide limiter unless a test gives it a clock or a limiter of its own", async () => {
+    const limiterOf = (f: Fetcher) => (f as unknown as { limiter: HostRateLimiter }).limiter;
+    const a = new Fetcher();
+    const b = new Fetcher({ maxPages: 3 });
+    const own = new HostRateLimiter(1000, fakeClock());
+    const c = new Fetcher({ limiter: own });
+    const d = new Fetcher({ clock: fakeClock() });
+    expect(limiterOf(a)).toBe(sharedHostRateLimiter());
+    expect(limiterOf(b)).toBe(limiterOf(a));
+    expect(limiterOf(c)).toBe(own);
+    expect(limiterOf(d)).not.toBe(sharedHostRateLimiter());
+    await Promise.all([a, b, c, d].map((f) => f.close()));
+  });
+  it("two callers on one limiter are spaced even when they ask at the same moment for the same host in different letter case", async () => {
+    const clock = fakeClock();
+    const rl = new HostRateLimiter(1000, clock);
+    const [x, y] = await Promise.all([rl.acquire("Shop.example:8443"), rl.acquire("shop.example:8443")]);
+    expect(Math.abs(y - x)).toBe(1000);
+  });
+  it("forgets idle hosts once many are remembered, and never one with a slot still ahead or a queue", async () => {
+    const clock = fakeClock();
+    const rl = new HostRateLimiter(1000, clock);
+    for (let i = 0; i < LIMITER_SWEEP_AT; i++) await rl.acquire(`h${i}.example`);
+    expect(rl.size).toBe(LIMITER_SWEEP_AT);
+    await clock.sleep(5000); // every slot above has passed
+    const busy = await rl.acquire("busy.example"); // sweeps the idle hosts, then takes a slot
+    expect(rl.size).toBe(1);
+    // fill up again while busy.example's next slot is still ahead: it must survive the sweep and still space its next request
+    for (let i = 0; i < LIMITER_SWEEP_AT; i++) await rl.acquire(`g${i}.example`);
+    const again = await rl.acquire("busy.example"); // sweeps again: nothing is idle, so nothing is forgotten
+    expect(again - busy).toBe(1000);
+    expect(rl.size).toBe(LIMITER_SWEEP_AT + 1);
   });
   it("resolves with the granted start, and the next grant is a full interval after it (D-47)", async () => {
     // A tick lands between a grant and any later clock read; the fetcher logs the grant, not a fresh read.
