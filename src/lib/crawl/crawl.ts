@@ -33,10 +33,15 @@ export class CrawlRefused extends Error {
   }
 }
 
-/** Accept "example.com" as well as full URLs; only http(s). */
+/**
+ * Accept "example.com" and "example.com:8443" as well as full URLs; only http(s). The input counts as having a scheme
+ * only if it contains "://" or starts with http: / https:, so the "host:" of host:port is not read as one (PRD-02
+ * requirement 7; review 2026-11-20, UX-5). Anything else gets https:// and is then vetted by `parseTarget`.
+ */
 export function normaliseStartUrl(input: string): string {
   const trimmed = input.trim();
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const hasScheme = trimmed.includes("://") || /^https?:/i.test(trimmed);
+  const withScheme = hasScheme ? trimmed : `https://${trimmed}`;
   const url = parseTarget(withScheme);
   url.hash = "";
   return url.href;

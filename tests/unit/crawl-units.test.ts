@@ -28,6 +28,20 @@ describe("normaliseStartUrl", () => {
   it.each(["file:///etc/passwd", "ftp://shop.example/", "javascript:alert(1)", "gopher://x.example", "http://user:pw@shop.example/"])("refuses %s", (u) => {
     expect(() => normaliseStartUrl(u)).toThrow();
   });
+  // PRD-02 requirement 7 (review 2026-11-20, UX-5): only "://" or a leading http:/https: counts as a scheme.
+  it("treats host:port without a scheme as a host, not as a scheme", () => {
+    expect(normaliseStartUrl("goodshop.test:7911")).toBe("https://goodshop.test:7911/");
+    expect(normaliseStartUrl("goodshop.test:7911/products/x?y=1")).toBe("https://goodshop.test:7911/products/x?y=1");
+    expect(normaliseStartUrl(" Shop.Example:8443 ")).toBe("https://shop.example:8443/");
+  });
+  it("keeps an explicit http or https scheme, in any letter case", () => {
+    expect(normaliseStartUrl("http://goodshop.test:7911/")).toBe("http://goodshop.test:7911/");
+    expect(normaliseStartUrl("HTTP://shop.example")).toBe("http://shop.example/");
+    expect(normaliseStartUrl("https:shop.example")).toBe("https://shop.example/");
+  });
+  it.each(["mailto:someone@shop.example", "data:text/html,<h1>x</h1>", "FILE:///etc/passwd", "user:pw@shop.example"])("still refuses %s", (u) => {
+    expect(() => normaliseStartUrl(u)).toThrow();
+  });
 });
 
 describe("HostRateLimiter", () => {
