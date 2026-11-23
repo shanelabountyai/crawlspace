@@ -10,6 +10,10 @@ for (const [net, prefix] of [
 for (const [net, prefix] of [
   ["::", 128], ["::1", 128], ["100::", 64], ["2001:db8::", 32], ["2001::", 32], ["2002::", 16],
   ["fc00::", 7], ["fe80::", 10], ["fec0::", 10], ["ff00::", 8],
+  // PRD-02 requirement 8 (review 2026-11-20, SEC-8; D-22 extended): two ranges a translator turns into IPv4, refused whole
+  // rather than judged by the IPv4 address they carry. ::ffff:0:0:0/96 is IPv4-translated (RFC 2765, SIIT);
+  // 64:ff9b:1::/48 is local-use NAT64 (RFC 8215). IPv4-mapped ::ffff:a.b.c.d and 64:ff9b::/96 stay judged by `embeddedV4`.
+  ["::ffff:0:0:0", 96], ["64:ff9b:1::", 48],
 ] as const) blocked.addSubnet(net, prefix, "ipv6");
 
 function embeddedV4(ip: string): string | null {

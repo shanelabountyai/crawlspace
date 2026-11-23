@@ -36,6 +36,30 @@ describe("CS-03 SSRF guard", () => {
     expect(srv.hits).toEqual([]);
   });
 
+  // PRD-02 requirement 8 (SEC-8): IPv4-translated (::ffff:0:0:0/96) and local-use NAT64 (64:ff9b:1::/48) addresses.
+  it("refuses the IPv4-translated and local-use NAT64 ranges before any connection, as a literal and as a DNS answer", async () => {
+    const before = srv.hits.length;
+    const literals = [
+      `http://[::ffff:0:127.0.0.1]:${srv.port}/`,
+      `http://[::ffff:0:8.8.8.8]:${srv.port}/`,
+      `http://[64:ff9b:1::7f00:1]:${srv.port}/`,
+      `http://[64:ff9b:1::8.8.8.8]:${srv.port}/`,
+    ];
+    for (const t of literals) await expect(crawlSite(t, { render: false }), t).rejects.toBeInstanceOf(SsrfError);
+    for (const address of ["::ffff:0:7f00:1", "::ffff:0:808:808", "64:ff9b:1::7f00:1", "64:ff9b:1::808:808"]) {
+      let connects = 0;
+      const guard = {
+        resolver: async () => {
+          connects++;
+          return [address];
+        },
+      };
+      await expect(crawlSite(`http://translated.example:${srv.port}/`, { render: false, guard }), address).rejects.toBeInstanceOf(SsrfError);
+      expect(connects, address).toBe(1); // resolved once for the pre-check, never again for a connection
+    }
+    expect(srv.hits.length).toBe(before);
+  });
+
   it("refuses a public-looking hostname that resolves to loopback", async () => {
     const before = srv.hits.length;
     const guard = { resolver: async () => ["93.184.216.34", "127.0.0.1"], policy: testGuard.policy };

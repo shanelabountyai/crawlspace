@@ -12,6 +12,13 @@ describe("isPublicAddress", () => {
     "64:ff9b::a9fe:a9fe", "2001:db8::1", "[::1]", "fe80::1%eth0", "not-an-ip", "",
   ])("%s is not public", (ip) => expect(isPublicAddress(ip)).toBe(false));
   it.each(["93.184.216.34", "8.8.8.8", "172.32.0.1", "2606:4700:4700::1111", "::ffff:8.8.8.8"])("%s is public", (ip) => expect(isPublicAddress(ip)).toBe(true));
+  // PRD-02 requirement 8 (review 2026-11-20, SEC-8; D-22 extended): the IPv4-translated range ::ffff:0:0:0/96 (RFC 2765)
+  // and the local-use NAT64 range 64:ff9b:1::/48 (RFC 8215) are refused whole, whatever IPv4 address they carry.
+  it.each([
+    "::ffff:0:127.0.0.1", "::ffff:0:7f00:1", "::ffff:0:10.0.0.1", "::ffff:0:8.8.8.8", "::ffff:0:808:808", "[::ffff:0:a9fe:a9fe]",
+    "64:ff9b:1::7f00:1", "64:ff9b:1::8.8.8.8", "64:ff9b:1:ffff:ffff:ffff:808:808", "64:ff9b:1::", "[64:ff9b:1::a9fe:a9fe]",
+  ])("%s (IPv4-translated or local-use NAT64) is not public", (ip) => expect(isPublicAddress(ip)).toBe(false));
+  it.each(["64:ff9b:2::1", "::fffe:0:808:808"])("%s is outside the two refused ranges", (ip) => expect(isPublicAddress(ip)).toBe(true));
 });
 
 describe("normaliseStartUrl", () => {
