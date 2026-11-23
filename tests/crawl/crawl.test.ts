@@ -168,3 +168,60 @@ describe("robots.txt on a network error and after a cross-origin home redirect",
     expect(report.skipped.some((s) => s.url.endsWith("/products/secret"))).toBe(true);
   }, 60_000);
 });
+
+// PRD-02 requirement 4 (review 2026-11-20, UX-1; Decision 3b): the crawl's home is the origin root, whatever was pasted.
+describe("the crawl starts at the origin root", () => {
+  let srv: SiteServer;
+  let base: string;
+  const paths = () => srv.hits.filter((h) => h.host === "walledshop.test").map((h) => h.path);
+  /** Everything on a scorecard except the clock: per-check status and weight, category scores, overall, site type. */
+  const comparable = (r: CrawlResult) => {
+    const card = scanSnapshot(r.snapshot, { agents: fixtureAgents() });
+    return {
+      url: card.url,
+      siteType: card.siteType,
+      overall: card.overall,
+      categories: card.categories,
+      checks: card.checks.map((c) => ({ id: c.id, status: c.status, weight: c.weight })),
+      pages: r.snapshot.pages.map((p) => ({ id: p.id, kind: p.kind, url: p.url, status: p.status, rawHtml: p.rawHtml })),
+    };
+  };
+
+  beforeAll(async () => {
+    srv = await new SiteServer().start();
+    base = srv.site("walledshop.test", fixtureRoutes("walled-shop", `http://walledshop.test:${srv.port}`));
+  });
+  afterAll(async () => {
+    await srv.stop();
+  });
+
+  it("pasting /nope-404-page on walledshop gives the same scorecard as /, and the 404 path is never requested", async () => {
+    const root = await crawlSite(`${base}/`, { guard: testGuard });
+    const deep = await crawlSite(`${base}/nope-404-page`, { guard: testGuard });
+    expect(paths()).not.toContain("/nope-404-page");
+    expect(deep.snapshot.url).toBe(`${base}/`);
+    expect(deep.snapshot.pages.find((p) => p.kind === "home")?.url).toBe(`${base}/`);
+    expect(comparable(deep)).toEqual(comparable(root));
+    expect(comparable(root).overall).not.toBeNull();
+  }, 180_000);
+
+  it("a pasted product link with a query and a fragment also starts at /", async () => {
+    const before = srv.hits.length;
+    const { snapshot, report } = await crawlSite(`${base}/products/trail-kettle?utm_source=x#reviews`, { guard: testGuard, render: false });
+    const mine = srv.hits.slice(before).map((h) => h.path);
+    expect(mine.slice(0, 2)).toEqual(["/robots.txt", "/"]);
+    expect(mine.some((p) => p.includes("utm_source"))).toBe(false);
+    expect(snapshot.url).toBe(`${base}/`);
+    expect(report.requests[1]?.url).toBe(`${base}/`);
+  }, 60_000);
+
+  it("robots.txt is judged for the home page, not for the pasted path", async () => {
+    const b = srv.site("partly-closed.test", {
+      "/robots.txt": { type: "text/plain", body: "User-agent: *\nDisallow: /account/\n" },
+      "/": { body: "<!doctype html><html><head><title>Home</title></head><body><h1>Home</h1></body></html>" },
+    });
+    const { snapshot } = await crawlSite(`${b}/account/orders`, { guard: testGuard, render: false });
+    expect(snapshot.url).toBe(`${b}/`);
+    expect(srv.hits.filter((h) => h.host === "partly-closed.test").map((h) => h.path)).not.toContain("/account/orders");
+  }, 60_000);
+});

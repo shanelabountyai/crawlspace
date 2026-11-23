@@ -51,10 +51,13 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** Crawl one site politely and return a snapshot the Phase 1 engine can score. */
+/** Crawl one site politely, starting at its home page, and return a snapshot the Phase 1 engine can score. */
 export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise<CrawlResult> {
-  const startUrl = normaliseStartUrl(input);
-  await assertAllowed(startUrl, opts.guard); // CS-03: refused before anything is sent
+  const enteredUrl = normaliseStartUrl(input);
+  await assertAllowed(enteredUrl, opts.guard); // CS-03: refused before anything is sent
+  // A site is scored from its home page: the crawl starts at the origin root whatever path, query or fragment was
+  // entered (PRD-02 requirement 4; review 2026-11-20, UX-1; Decision 3b). The address as entered stays on the scan row.
+  const startUrl = `${new URL(enteredUrl).origin}/`;
 
   const fetcher = new Fetcher(opts);
   const renderer = opts.renderer ? opts.renderer(fetcher) : opts.render === false ? new NoRenderer() : new PlaywrightRenderer(fetcher);
