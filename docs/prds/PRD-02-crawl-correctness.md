@@ -1,6 +1,6 @@
 # PRD-02 — Crawl correctness and politeness
 
-Status: **Built (draft PR)** (2026-11-23, branch `prd-02/crawl-correctness`; decisions D-115..D-124). Proposed 2026-11-20. Source: `docs/REVIEW-2026-11-20.md` ranks 15, 16, 27, 28 and the per-host part
+Status: **Built and merged** (PR #17, merge commit ebc62a3, 2026-11-24; decisions D-115..D-126; not deployed until the next manual Render deploy). Proposed 2026-11-20. Source: `docs/REVIEW-2026-11-20.md` ranks 15, 16, 27, 28 and the per-host part
 of 17. Owner decisions: 3b + 3c (start at the origin, refuse a 4xx/5xx start page), 10a (robots network error =
 disallow).
 
