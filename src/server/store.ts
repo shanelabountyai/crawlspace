@@ -14,6 +14,8 @@ export interface CrawlSummary {
   blockedBrowserRequests: number;
   skipped: { url: string; reason: string }[];
   notes: string[];
+  /** False when a page could not be rendered (PRD-02 requirement 6). Absent on reports stored before the flag existed. */
+  rendered?: boolean;
 }
 
 export interface ReportView {
@@ -44,6 +46,7 @@ export function summariseCrawl(report: CrawlReport): CrawlSummary {
     blockedBrowserRequests: report.renderEvents.filter((e) => e.action === "blocked").length,
     skipped: report.skipped.map((s) => ({ ...s })),
     notes: [...report.notes],
+    rendered: report.rendered,
   };
 }
 

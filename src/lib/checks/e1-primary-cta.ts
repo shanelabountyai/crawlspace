@@ -10,6 +10,7 @@ export const e1PrimaryCta: CheckDefinition = {
   title: "Primary call to action is a real button or link with a name",
   label: "heuristic",
   appliesTo: ["ecommerce", "event"],
+  needsRendered: true,
   run(ctx) {
     const oks: boolean[] = [];
     const evidence: Evidence[] = [];

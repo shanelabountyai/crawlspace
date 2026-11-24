@@ -1,10 +1,10 @@
 # PRD-02 — Crawl correctness and politeness
 
-Status: **Proposed** (2026-11-20). Source: `docs/REVIEW-2026-11-20.md` ranks 15, 16, 27, 28 and the per-host part
+Status: **Built (draft PR)** (2026-11-23, branch `prd-02/crawl-correctness`; decisions D-115..D-124). Proposed 2026-11-20. Source: `docs/REVIEW-2026-11-20.md` ranks 15, 16, 27, 28 and the per-host part
 of 17. Owner decisions: 3b + 3c (start at the origin, refuse a 4xx/5xx start page), 10a (robots network error =
 disallow).
 
-**Needs Shane's OK on scoring-adjacent behaviour before building.** Requirements 4-6 change which pages and which
+**Needed Shane's OK on scoring-adjacent behaviour before building: given 2026-11-23 (D-115).** Requirements 4-6 change which pages and which
 view the checks see, so scores for some sites will change. Kept unchanged: CS-01..CS-05, the D-34 bands, weights in
 `rules/weights.json`, every fixture's `expected.json` (any fixture whose result changes needs a new fixture instead).
 
@@ -70,7 +70,7 @@ bands, the UI note for deep links (PRD-04), abuse limits (PRD-03).
 
 ## 7. Dependencies
 
-- Shane's OK on scoring-adjacent behaviour (requirements 4-6).
+- Shane's OK on scoring-adjacent behaviour (requirements 4-6). **Met:** given 2026-11-23 in chat (D-115).
 - Review rank 1 (live smoke test) shows whether requirement 6 already affects live reports.
 - PRD-01 and PR #12 also touch `render.ts`: merge order PR #12 → PRD-01 → PRD-02, or one branch.
 - PRD-04 owns the wording of the new stop reasons (proposed, Shane edits).
@@ -81,7 +81,13 @@ M overall (requirements 1-3, 7, 8: S each; 4-6: M).
 
 ## 9. Open questions
 
+Answered for the build as below; each is a default Shane can change (see the D-row).
+
 1. Requirement 6: N/A (score unaffected) or fail the whole scan? N/A is proposed so a report still appears; Shane
-   decides.
-2. Requirement 5: should a 401 home (login wall) stop too, or stay a finding?
+   decides. **Built: N/A (D-122).**
+2. Requirement 5: should a 401 home (login wall) stop too, or stay a finding? **Built: stays an A4 finding, like
+   403, 429 and 503 (D-121).**
 3. Requirement 4: if the visitor deliberately pasted a product page, should it be counted among the key pages?
+   **Built: no (D-120).**
+
+Requirement 8 names `::ffff:0:0/96`; the range refused is the IPv4-translated `::ffff:0:0:0/96` (D-117).

@@ -1,6 +1,6 @@
 import { Agent, request } from "undici";
 import { MAX_ASSETS_TOTAL, MAX_BODY_BYTES, MAX_PAGES, MAX_REDIRECTS, MIN_INTERVAL_MS, REQUEST_TIMEOUT_MS, USER_AGENT } from "./config";
-import { HostRateLimiter, realClock, type Clock } from "./ratelimit";
+import { HostRateLimiter, realClock, sharedHostRateLimiter, type Clock } from "./ratelimit";
 import { assertAllowed, guardedLookup, parseTarget, type GuardOptions } from "./ssrf";
 
 export type RequestKind = "page" | "asset";
@@ -31,9 +31,21 @@ export class BudgetExceeded extends Error {
   }
 }
 
+export interface GetOptions {
+  /**
+   * Called before each redirect hop is requested, after the SSRF check on it and before it counts against the budget.
+   * Throw to stop: nothing is sent to the hop's URL. The crawler reads the new origin's robots.txt here (PRD-02
+   * requirement 1).
+   */
+  beforeRedirect?: (url: string) => Promise<void>;
+}
+
 export interface FetcherOptions {
   guard?: GuardOptions;
+  /** Tests: a clock of their own. A fetcher given one gets a private limiter on that clock unless `limiter` is set. */
   clock?: Clock;
+  /** Default: the process-wide limiter shared by every scan (PRD-02 requirement 3). */
+  limiter?: HostRateLimiter;
   maxPages?: number;
   maxAssets?: number;
   timeoutMs?: number;
@@ -41,7 +53,8 @@ export interface FetcherOptions {
 
 /**
  * The only way Crawlspace touches the network. GET only (there is no method parameter), every hop SSRF-checked
- * before connecting and again at connect time, 1 request/second per host, hard request budgets.
+ * before connecting and again at connect time, 1 request/second per host across every scan in the process, hard
+ * request budgets per scan.
  */
 export class Fetcher {
   readonly log: RequestLogEntry[] = [];
@@ -56,7 +69,7 @@ export class Fetcher {
 
   constructor(private readonly opts: FetcherOptions = {}) {
     this.clock = opts.clock ?? realClock;
-    this.limiter = new HostRateLimiter(MIN_INTERVAL_MS, this.clock);
+    this.limiter = opts.limiter ?? (opts.clock ? new HostRateLimiter(MIN_INTERVAL_MS, this.clock) : sharedHostRateLimiter());
     this.maxPages = Math.min(opts.maxPages ?? MAX_PAGES, MAX_PAGES);
     this.maxAssets = Math.min(opts.maxAssets ?? MAX_ASSETS_TOTAL, MAX_ASSETS_TOTAL);
     this.timeoutMs = opts.timeoutMs ?? REQUEST_TIMEOUT_MS;
@@ -83,11 +96,12 @@ export class Fetcher {
     }
   }
 
-  async get(rawUrl: string, kind: RequestKind): Promise<FetchResult> {
+  async get(rawUrl: string, kind: RequestKind, options: GetOptions = {}): Promise<FetchResult> {
     const redirects: string[] = [];
     let url = parseTarget(rawUrl).href;
     for (let hop = 0; ; hop++) {
       await assertAllowed(url, this.opts.guard); // refuse before any connection (CS-03)
+      if (hop > 0) await options.beforeRedirect?.(url);
       this.take(kind); // a redirect hop is a request and counts (CS-02)
       const host = new URL(url).host;
       const startedAt = await this.limiter.acquire(host); // the granted slot (D-47)

@@ -1,6 +1,7 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Manifest, Snapshot } from "./schema";
+import type { z } from "zod";
+import type { ManifestSchema, Snapshot } from "./schema";
 
 /** Write a snapshot in the on-disk fixture format, so `loadSnapshotFromDir` can read it back. */
 export function writeSnapshotToDir(s: Snapshot, dir: string): void {
@@ -10,13 +11,14 @@ export function writeSnapshotToDir(s: Snapshot, dir: string): void {
     if (r.body !== null) writeFileSync(join(dir, file), r.body);
     return { status: r.status, file: r.body === null ? null : file };
   };
-  const manifest: Manifest = {
+  const manifest: z.input<typeof ManifestSchema> = {
     url: s.url,
     fetchedAt: s.fetchedAt,
     siteTypeOverride: s.siteTypeOverride,
     robots: res(s.robots, "robots.txt"),
     sitemap: res(s.sitemap, "sitemap.xml"),
     llms: res(s.llms, "llms.txt"),
+    ...(s.rendered ? {} : { rendered: false }),
     pages: s.pages.map((p) => {
       const raw = `pages/${p.id}.raw.html`;
       const rendered = `pages/${p.id}.rendered.html`;

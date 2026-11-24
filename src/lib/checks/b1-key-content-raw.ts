@@ -40,6 +40,7 @@ export const b1KeyContentRaw: CheckDefinition = {
   category: "B",
   title: "Key content is in the raw HTML (no JavaScript needed)",
   appliesTo: "all",
+  needsRendered: true,
   run(ctx) {
     const oks: boolean[] = [];
     const evidence: Evidence[] = [];

@@ -27,6 +27,7 @@ export function loadSnapshotFromDir(dir: string): Snapshot {
     robots: resource(manifest.robots, "/robots.txt"),
     sitemap: resource(manifest.sitemap, "/sitemap.xml"),
     llms: resource(manifest.llms, "/llms.txt"),
+    rendered: manifest.rendered,
     pages: manifest.pages.map((p) => ({
       id: p.id,
       url: p.url,

@@ -2,7 +2,7 @@ import { visibleText, parse, collapse } from "../html";
 import type { Page } from "../snapshot";
 import type { CheckDefinition, Evidence } from "./types";
 
-const WALL_STATUSES = new Set([401, 403, 429, 503]);
+export const WALL_STATUSES: ReadonlySet<number> = new Set([401, 403, 429, 503]);
 const MARKERS = [/just a moment\.\.\./i, /checking your browser/i, /attention required/i, /verify you are (a )?human/i, /cf-chl-/i, /challenge-platform/i];
 
 export function wallReason(p: Page): string | null {

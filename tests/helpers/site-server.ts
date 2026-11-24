@@ -16,6 +16,8 @@ export interface Route {
   type?: string;
   body?: string;
   headers?: Record<string, string>;
+  /** Close the connection without answering (a network error for the client). */
+  destroy?: boolean;
 }
 
 export type Routes = Record<string, Route | ((req: IncomingMessage) => Route)>;
@@ -40,6 +42,7 @@ export class SiteServer {
         res.writeHead(404, { "content-type": "text/plain" });
         return res.end("not found");
       }
+      if (r.destroy) return void req.socket.destroy();
       res.writeHead(r.status ?? 200, { "content-type": r.type ?? "text/html; charset=utf-8", ...(r.headers ?? {}) });
       res.end(r.body ?? "");
     });

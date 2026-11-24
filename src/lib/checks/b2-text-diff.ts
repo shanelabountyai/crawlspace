@@ -6,6 +6,7 @@ export const b2TextDiff: CheckDefinition = {
   category: "B",
   title: "Most visible text is present without JavaScript",
   appliesTo: "all",
+  needsRendered: true,
   run(ctx) {
     let raw = 0;
     let rendered = 0;

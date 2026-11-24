@@ -82,3 +82,18 @@ export function sitemapsFromRobots(body: string): string[] {
     .map((l) => /^\s*sitemap\s*:\s*(\S+)/i.exec(l)?.[1])
     .filter((x): x is string => Boolean(x));
 }
+
+/** The outcome of fetching a robots.txt: an HTTP answer, or the error that prevented one. */
+export type RobotsFetch = { status: number; body: string } | { error: string };
+export type RobotsAccess = { ok: true; groups: RobotsGroup[] } | { ok: false; why: string };
+
+/**
+ * What a robots.txt fetch means for a crawler (RFC 9309 section 2.3.1; D-24; PRD-02 requirement 2, Decision 10a):
+ * unreachable (network error) or 5xx → disallow everything; 200 → its rules; anything else (4xx) → no rules.
+ * `why` is a short clause the caller puts after the file's name ("robots.txt returned 503").
+ */
+export function robotsAccess(fetched: RobotsFetch): RobotsAccess {
+  if ("error" in fetched) return { ok: false, why: `could not be read (${fetched.error})` };
+  if (fetched.status >= 500) return { ok: false, why: `returned ${fetched.status}` };
+  return { ok: true, groups: fetched.status === 200 ? parseRobots(fetched.body) : [] };
+}

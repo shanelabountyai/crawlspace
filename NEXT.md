@@ -1,5 +1,61 @@
 # Crawlspace — next
 
+## PRD-02: crawl correctness and politeness (scheduled run, 2026-11-23, branch `prd-02/crawl-correctness`)
+
+One draft PR ("Crawlspace: PRD-02 Crawl correctness and politeness"), base `main` (6365781, PR #16 merged), not merged.
+**Nothing was deployed**; no Render, Cloudflare, Vercel or HubSpot setting, environment variable or secret was touched.
+No schema change, no migration. Your OK on the scoring-adjacent requirements (4-6) is recorded as D-115.
+
+- **Built (all 8 requirements, each with tests that failed first):**
+  1. After a home redirect to another origin, that origin's robots.txt is read before anything else is requested
+     there; 5xx, unreadable or "disallowed" stops the scan, naming the host. Also when the robots.txt itself redirects.
+  2. A robots.txt that cannot be read (network error) stops the scan (Decision 10a).
+  3. One per-host 1 request/second limit for the whole process (two scans started together: 0 ms apart before,
+     ≥ 1,000 ms now).
+  4. The crawl starts at the origin root whatever was pasted; the address as entered stays on the scan.
+  5. A home page answering 4xx/5xx stops the scan; 401/403/429/503 stay an A4 finding (D-121).
+  6. `rendered` on the snapshot; if any page could not be rendered, B1, B2, E1-E4 are "Not applicable: page could not
+     be rendered" (score-neutral), and the report's "How this site was read" list and the PDF say rendering failed.
+  7. `goodshop.test:7911` (host:port, no scheme) is accepted.
+  8. IPv4-translated (`::ffff:0:0:0/96`) and local-use NAT64 (`64:ff9b:1::/48`) addresses are refused (D-117).
+- **Scores change for some sites, as you approved:** a pasted deep link is now scored from the home page; a site whose
+  home answers 404/500 gets "Not scanned" instead of a score; a scan where Chromium failed loses its B and E results
+  instead of showing wrong ones (JS-only test shop with a failing renderer: 38.6 before, B and E N/A after).
+  **Unchanged:** CS-01..CS-05, D-34 bands, `rules/weights.json`, every fixture and `expected.json`, each check's own
+  logic, the Prisma schema, existing sentences on the report and the PDF.
+- **Decisions:** D-115 (your OK), D-116 (run setup), D-117 (which IPv6 range), D-118 (limiter), D-119 (robots.txt),
+  D-120 (origin root; pasted page is not a key page), D-121 (401 stays a finding), D-122 (N/A, one flag for the whole
+  snapshot), D-123 (new wording, proposed: yours to edit in PRD-04), D-124 (flaky operator test, below), D-125 (review).
+- **Independent review (D-125):** 1 must-fix, 4 should-fix, 10 nits. Fixed: the must-fix (robots.txt that redirects to
+  another site), 2 should-fix (scheme detection, status-only stop) and 3 nits. Recorded for you, not changed: key pages
+  that redirect to another origin are still followed without reading its robots.txt; one unrendered page makes B and E
+  N/A for the whole report; the rest is listed in D-125.
+- **Gate before (main, 6365781):** `npm ci` 0, lint 0, typecheck 0, `npm test` 534/534 (32 files), build 0,
+  `npm run e2e` 23/23, base-path build 0, `npm run e2e:base-path` 4/4.
+- **Gate after (branch, c8d4e08 plus docs):** `npm ci` 0 (lockfile unchanged), lint 0, typecheck 0, `npm test`
+  612/612 (33 files), build 0, `npm run e2e` 23/23, base-path build 0, `npm run e2e:base-path` 4/4. No existing test
+  was deleted, skipped or weakened. CI results are in the PR body.
+- **Flaky test found, not caused by this branch (D-124):** `tests/server/operator-auth.test.ts:48` fails about 1 run
+  in 16 on any branch (measured 252 of 4,000). If CI's `check` goes red on that line, re-run it.
+- **Not verified:** anything on Render (whether Chromium ever fails to render there, which is what requirement 6
+  guards against); `scripts/check-migrations.sh` and the Docker image locally (D-26, D-71; CI decides); a real
+  NAT64/SIIT network (requirement 8 is tested against the address check only); live sites (all crawl tests use the
+  local fixture server).
+
+**Your hand steps, in order:**
+
+1. You: review the draft PR; merge it once `check` and `docker` are green. Merge order: #16 is already in main, so
+   this PR goes straight onto main. Claude does not merge.
+2. You: start a manual deploy on Render (auto-deploy is off), then one scan of a site you own that needs JavaScript.
+   In the report's "How this site was read" list there should be **no** "rendering failed" line, and B and E should
+   show results. If the line is there, Chromium is failing on Render: send the lines under it.
+3. You: paste a deep link of your own site (for example a product page): the report should be for the home page.
+4. You: decide the three defaults you can still change: 401 home page stops or stays a finding (D-121); one
+   unrendered page voids B and E for the whole report, or only for that page (D-122); a pasted product page counted
+   as a key page or not (D-120).
+5. You: the new stop-reason and note wording is proposed only (D-123); edit it with PRD-04.
+6. You, later: a small PR for the flaky operator test (D-124).
+
 ## PRD-01 Phase A: headless browser isolation (scheduled run, 2026-11-22, branch `prd-01/browser-isolation`)
 
 One draft PR, #16 ("Crawlspace: PRD-01 Phase A, headless browser isolation"), not merged. **Nothing was deployed**; no

@@ -1,9 +1,10 @@
-import { isAllowed, parseRobots, sitemapsFromRobots, type RobotsGroup } from "../robots";
+import { isAllowed, robotsAccess, sitemapsFromRobots, type RobotsFetch, type RobotsGroup } from "../robots";
+import { WALL_STATUSES } from "../checks/a4-no-bot-wall";
 import { pathOf } from "../html";
 import { SnapshotSchema, type Page, type PageKind, type Resource, type Snapshot } from "../snapshot";
 import { MAX_KEY_PAGES, ROBOTS_TOKEN } from "./config";
 import { extractLinks, findActionLink, guessSiteType, pageKind, parseSitemap, pickKeyPages, sameSite } from "./discover";
-import { BudgetExceeded, Fetcher, type FetchResult, type FetcherOptions } from "./fetcher";
+import { BudgetExceeded, Fetcher, type FetchResult, type FetcherOptions, type GetOptions } from "./fetcher";
 import { NoRenderer, PlaywrightRenderer, type RenderEvent, type Renderer } from "./render";
 import { assertAllowed, parseTarget, SsrfError } from "./ssrf";
 
@@ -19,6 +20,8 @@ export interface CrawlReport {
   renderEvents: RenderEvent[];
   skipped: { url: string; reason: string }[];
   notes: string[];
+  /** False when any page could not be rendered or rendering was switched off; same value as `snapshot.rendered`. */
+  rendered: boolean;
 }
 
 export interface CrawlResult {
@@ -33,10 +36,16 @@ export class CrawlRefused extends Error {
   }
 }
 
-/** Accept "example.com" as well as full URLs; only http(s). */
+/**
+ * Accept "example.com" and "example.com:8443" as well as full URLs; only http(s). The input counts as having a scheme
+ * only if it starts with one followed by "://" or starts with http: / https:, so the "host:" of host:port is not read
+ * as one (PRD-02 requirement 7; review 2026-11-20, UX-5). A "://" further in, as in "shop.example/go?to=https://x", is
+ * part of the address, not a scheme (D-125). Anything else gets https:// and is then vetted by `parseTarget`.
+ */
 export function normaliseStartUrl(input: string): string {
   const trimmed = input.trim();
-  const withScheme = /^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? trimmed : `https://${trimmed}`;
+  const hasScheme = /^[a-z][a-z0-9+.-]*:\/\//i.test(trimmed) || /^https?:/i.test(trimmed);
+  const withScheme = hasScheme ? trimmed : `https://${trimmed}`;
   const url = parseTarget(withScheme);
   url.hash = "";
   return url.href;
@@ -46,20 +55,25 @@ function errText(e: unknown): string {
   return e instanceof Error ? e.message : String(e);
 }
 
-/** Crawl one site politely and return a snapshot the Phase 1 engine can score. */
+/** Crawl one site politely, starting at its home page, and return a snapshot the Phase 1 engine can score. */
 export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise<CrawlResult> {
-  const startUrl = normaliseStartUrl(input);
-  await assertAllowed(startUrl, opts.guard); // CS-03: refused before anything is sent
+  const enteredUrl = normaliseStartUrl(input);
+  await assertAllowed(enteredUrl, opts.guard); // CS-03: refused before anything is sent
+  // A site is scored from its home page: the crawl starts at the origin root whatever path, query or fragment was
+  // entered (PRD-02 requirement 4; review 2026-11-20, UX-1; Decision 3b). The address as entered stays on the scan row.
+  const startUrl = `${new URL(enteredUrl).origin}/`;
 
   const fetcher = new Fetcher(opts);
-  const renderer = opts.renderer ? opts.renderer(fetcher) : opts.render === false ? new NoRenderer() : new PlaywrightRenderer(fetcher);
-  const report: CrawlReport = { requests: fetcher.log, renderEvents: renderer.events, skipped: [], notes: [] };
+  const renderOff = !opts.renderer && opts.render === false;
+  const renderer = opts.renderer ? opts.renderer(fetcher) : renderOff ? new NoRenderer() : new PlaywrightRenderer(fetcher);
+  const report: CrawlReport = { requests: fetcher.log, renderEvents: renderer.events, skipped: [], notes: [], rendered: !renderOff };
   const fetchedAt = new Date().toISOString();
 
-  const tryGet = async (url: string, why: string): Promise<FetchResult | null> => {
+  const tryGet = async (url: string, why: string, options?: GetOptions): Promise<FetchResult | null> => {
     try {
-      return await fetcher.get(url, "page");
+      return await fetcher.get(url, "page", options);
     } catch (e) {
+      if (e instanceof CrawlRefused) throw e; // a robots.txt stop raised from a redirect hop
       if (e instanceof BudgetExceeded) report.skipped.push({ url, reason: `page budget used up (${why})` });
       else if (e instanceof SsrfError) report.skipped.push({ url, reason: `refused: ${e.message}` });
       else report.notes.push(`${why} ${url} failed: ${errText(e)}`);
@@ -69,27 +83,72 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
   const resource = (url: string, r: FetchResult | null): Resource => ({ url, status: r?.status ?? 0, body: r && r.status === 200 ? r.body : null });
 
   try {
-    // 1. robots.txt for our own user agent
+    // 1. robots.txt for our own user agent. Each origin's file is read once, before anything else is fetched there.
     const origin0 = new URL(startUrl).origin;
-    const robotsRes = await tryGet(`${origin0}/robots.txt`, "robots.txt");
-    // RFC 9309: 4xx = no rules; 5xx = treat as "disallow all", so we do not scan.
-    if (robotsRes && robotsRes.status >= 500) throw new CrawlRefused(`robots.txt returned ${robotsRes.status}; treating as disallow-all and not scanning`);
-    let groups: RobotsGroup[] = robotsRes && robotsRes.status === 200 ? parseRobots(robotsRes.body) : [];
-    const allowed = (url: string) => isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed;
-    if (!allowed(startUrl)) throw new CrawlRefused(`robots.txt disallows ${ROBOTS_TOKEN} from ${pathOf(startUrl)}; not scanning`);
+    interface OriginRobots {
+      resource: Resource;
+      groups: RobotsGroup[];
+      /** How messages name this file: "robots.txt" for the origin that was entered. */
+      label: string;
+    }
+    const robotsByOrigin = new Map<string, OriginRobots>();
+    const reading = new Set<string>();
+    const robotsFor = async (origin: string): Promise<OriginRobots> => {
+      const known = robotsByOrigin.get(origin);
+      if (known) return known;
+      const url = `${origin}/robots.txt`;
+      const label = origin === origin0 ? "robots.txt" : `robots.txt on ${new URL(origin).host} (the home page redirects there)`;
+      // Two robots.txt files that redirect into each other's sites: neither can be read.
+      if (reading.has(origin)) throw new CrawlRefused(`${label} could not be read (redirect loop between robots.txt files); treating as disallow-all and not scanning`);
+      let res: FetchResult | null = null;
+      let fetched: RobotsFetch;
+      reading.add(origin);
+      try {
+        // A robots.txt may itself redirect. A hop on the same origin, or to another origin's /robots.txt, is followed;
+        // a hop to any other path on another origin (a moved site sending every path to its new home page) is a
+        // request to that origin like any other, so that origin's robots.txt is read and applied first (D-125).
+        const beforeRedirect = async (hop: string): Promise<void> => {
+          const h = new URL(hop);
+          if (h.origin !== origin && h.pathname !== "/robots.txt") await assertRobotsAllow(hop);
+        };
+        res = await fetcher.get(url, "page", { beforeRedirect });
+        fetched = { status: res.status, body: res.body };
+      } catch (e) {
+        if (e instanceof CrawlRefused) throw e;
+        fetched = { error: errText(e) };
+      } finally {
+        reading.delete(origin);
+      }
+      // RFC 9309: 4xx = no rules; 5xx or unreachable = treat as "disallow all", so we do not scan (D-24, Decision 10a).
+      const access = robotsAccess(fetched);
+      if (!access.ok) throw new CrawlRefused(`${label} ${access.why}; treating as disallow-all and not scanning`);
+      const entry: OriginRobots = { resource: resource(url, res), groups: access.groups, label };
+      robotsByOrigin.set(origin, entry);
+      return entry;
+    };
+    /** Throws CrawlRefused unless the URL's origin has a readable robots.txt that lets CrawlspaceBot fetch it. */
+    const assertRobotsAllow = async (url: string): Promise<void> => {
+      const { groups, label } = await robotsFor(new URL(url).origin);
+      if (!isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed) throw new CrawlRefused(`${label} disallows ${ROBOTS_TOKEN} from ${pathOf(url)}; not scanning`);
+    };
+    await assertRobotsAllow(startUrl);
 
-    // 2. home page (follows redirects; the final URL defines the site)
-    const homeRes = await tryGet(startUrl, "home page");
+    // 2. home page (follows redirects; the final URL defines the site). Before each redirect hop is requested, the
+    //    robots.txt of the hop's origin is read and applied, so a site that says no gets no request but that file.
+    const homeRes = await tryGet(startUrl, "home page", { beforeRedirect: assertRobotsAllow });
     if (!homeRes) throw new CrawlRefused(`could not fetch the home page: ${report.notes.at(-1) ?? report.skipped.at(-1)?.reason ?? "unknown error"}`);
     const home = homeRes.url;
     const origin = new URL(home).origin;
-    let robots = resource(`${origin0}/robots.txt`, robotsRes);
-    if (origin !== origin0) {
-      report.notes.push(`home redirected to ${origin}; using its robots.txt`);
-      const r2 = await tryGet(`${origin}/robots.txt`, "robots.txt");
-      robots = resource(`${origin}/robots.txt`, r2);
-      groups = r2 && r2.status === 200 ? parseRobots(r2.body) : [];
+    // A home page that answers 4xx/5xx is an error page, not the site: stop instead of scoring it (PRD-02 requirement 5;
+    // Decision 3c). The exception is the statuses A4 reports as a bot wall (401, 403, 429, 503): that is what an agent
+    // meets too, so it stays a finding on a finished report (D-15). Only the status decides: an ordinary 404 or 500
+    // page that happens to carry a challenge script is still an error page (D-121).
+    if (homeRes.status >= 400 && !WALL_STATUSES.has(homeRes.status)) {
+      throw new CrawlRefused(`the home page ${home} answered HTTP ${homeRes.status}; not scanning`);
     }
+    if (origin !== origin0) report.notes.push(`home redirected to ${origin}; using its robots.txt`);
+    const { resource: robots, groups } = await robotsFor(origin);
+    const allowed = (url: string) => isAllowed(groups, ROBOTS_TOKEN, pathOf(url)).allowed;
 
     // 3. sitemap (robots.txt pointer first, then /sitemap.xml; one level of sitemap index)
     const pointed = robots.body ? sitemapsFromRobots(robots.body).find((u) => sameSite(u, home)) : undefined;
@@ -138,11 +197,13 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
     // 7. render every fetched page (document served from the bytes already downloaded)
     const pages: Page[] = [];
     const counts = new Map<string, number>();
+    let renderFailures = 0;
     for (const { res, kind } of fetched) {
       let rendered = res.body;
       try {
         rendered = await renderer.render(res);
       } catch (e) {
+        renderFailures++;
         report.notes.push(`render of ${res.url} failed, using raw HTML: ${errText(e)}`);
       }
       const n = (counts.get(kind) ?? 0) + 1;
@@ -150,7 +211,16 @@ export async function crawlSite(input: string, opts: CrawlOptions = {}): Promise
       pages.push({ id: kind === "home" ? "home" : `${kind}-${n}`, url: res.url, kind, status: res.status, ttfbMs: res.ttfbMs, rawHtml: res.body, renderedHtml: rendered });
     }
 
-    const snapshot = SnapshotSchema.parse({ url: home, fetchedAt, siteTypeOverride: null, robots, sitemap, llms, pages });
+    // A page whose "rendered" HTML is only its raw HTML must not be scored as if it had been rendered (PRD-02
+    // requirement 6; review 2026-11-20, CQ-3): the flag makes the rendered-view checks N/A, and the note says why.
+    const naNote = "the checks that need the rendered page (categories B and E) are marked not applicable";
+    if (renderOff) report.notes.push(`rendering was switched off; ${naNote}`);
+    else if (renderFailures > 0) {
+      report.rendered = false;
+      report.notes.push(`rendering failed for ${renderFailures} of ${fetched.length} pages; ${naNote}`);
+    }
+
+    const snapshot = SnapshotSchema.parse({ url: home, fetchedAt, siteTypeOverride: null, robots, sitemap, llms, pages, rendered: report.rendered });
     return { snapshot, report };
   } finally {
     await renderer.close();

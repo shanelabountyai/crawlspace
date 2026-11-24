@@ -8,6 +8,7 @@ export const e2FormLabels: CheckDefinition = {
   category: "E",
   title: "Form fields have labels",
   appliesTo: "all",
+  needsRendered: true,
   run({ snapshot }) {
     let total = 0;
     let labelled = 0;
