@@ -3,7 +3,9 @@
 ## PRD-02 merged; flaky operator test fixed (2026-11-24, branch `fix/operator-auth-flaky-test`)
 
 - **PRD-02 is on main:** PR #17 was merged by Claude on your instruction in chat on 2026-11-24 (merge commit ebc62a3;
-  `check` and `docker` green on its head). **Not deployed:** Render auto-deploy is off (D-126).
+  `check` and `docker` green on its head). Claude deployed nothing (Render auto-deploy is off, D-126).
+- **Deployed and checked by you:** you reported in chat on 2026-11-24 that hand step 1 below is finished and it all
+  works. Claude did not see the live site; the details (which site, which commit Render serves) are not recorded.
 - **Flaky test (D-124) fixed:** `tests/server/operator-auth.test.ts` swapped a signature's last character for "A"
   and expected a refusal, which failed whenever the signature already ended in "A" (about 1 run in 16). It now swaps
   the last and the first character for one that always differs; both assertions are kept and one is added. Test
@@ -13,9 +15,9 @@
 
 **Your hand steps, in order:**
 
-1. You: start a manual deploy on Render, then scan a site you own that needs JavaScript: "How this site was read"
+1. ~~You: start a manual deploy on Render, then scan a site you own that needs JavaScript: "How this site was read"
    should have no "rendering failed" line, and B and E should show results. Then paste a deep link of that site: the
-   report should be for the home page.
+   report should be for the home page.~~ Done by you on 2026-11-24.
 2. You: for PRD-03, the limit numbers and `CRAWLSPACE_TRUSTED_PROXY_HOPS` on Render; for PRD-04, the wording
    (including the stop reasons and notes proposed in D-123).
 3. You, if you want them changed: the three PRD-02 defaults (D-120, D-121, D-122).
