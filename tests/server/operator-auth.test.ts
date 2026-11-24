@@ -45,7 +45,15 @@ describe("operator access (D-39)", () => {
     const t = issueToken(cfg, now);
     const [exp, sig] = t.split(".");
     expect(verifyToken(cfg, `${Number(exp) + 999_999}.${sig}`, now)).toBe(false);
-    expect(verifyToken(cfg, `${exp}.${sig!.slice(0, -1)}A`, now)).toBe(false);
+    // Swap the last and the first character of the signature for one that is guaranteed to differ. A fixed "A" left the
+    // token unchanged, and so valid, whenever the signature already ended in "A": about 1 run in 16 (D-124, D-126).
+    const other64 = (c: string) => (c === "A" ? "B" : "A");
+    const tamperedLast = `${exp}.${sig!.slice(0, -1)}${other64(sig!.at(-1)!)}`;
+    const tamperedFirst = `${exp}.${other64(sig![0]!)}${sig!.slice(1)}`;
+    expect(tamperedLast).not.toBe(t);
+    expect(tamperedFirst).not.toBe(t);
+    expect(verifyToken(cfg, tamperedLast, now)).toBe(false);
+    expect(verifyToken(cfg, tamperedFirst, now)).toBe(false);
     for (const bad of ["", ".", "abc", `${exp}.`, `.${sig}`, "1e99.x", null, undefined]) expect(verifyToken(cfg, bad as string, now)).toBe(false);
     const other = operatorConfig({ CRAWLSPACE_OPERATOR_PASSWORD: "a different password" } as unknown as NodeJS.ProcessEnv);
     expect(verifyToken(other, t, now)).toBe(false);
